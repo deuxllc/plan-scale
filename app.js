@@ -53,6 +53,10 @@ const calibrationHint = document.querySelector("#calibrationHint");
 const calibrationHintTitle = document.querySelector("#calibrationHintTitle");
 const calibrationHintText = document.querySelector("#calibrationHintText");
 const focusReferenceButton = document.querySelector("#focusReferenceButton");
+const baseConfirm = document.querySelector("#baseConfirm");
+const baseConfirmText = document.querySelector("#baseConfirmText");
+const confirmBaseButton = document.querySelector("#confirmBaseButton");
+const cancelBaseButton = document.querySelector("#cancelBaseButton");
 const referenceField = referenceLengthInput.closest(".toolbar-field");
 const segmentContextMenu = document.querySelector("#segmentContextMenu");
 const focusBaseInputButton = document.querySelector("#focusBaseInputButton");
@@ -105,6 +109,7 @@ const state = {
   isSpacePressed: false,
   isAnalyzing: false,
   hoveredSegmentId: null,
+  pendingReferenceId: null,
   lastPointerUpAt: 0,
 };
 
@@ -118,6 +123,8 @@ const VIEW_SAVE_DELAY = 220;
 const MIN_VIEW_SCALE = 0.05;
 const MAX_VIEW_SCALE = 12;
 const TOUCH_LONG_PRESS_MS = 560;
+const TOUCH_ENDPOINT_HIT_RADIUS = 44;
+const TOUCH_ENDPOINT_DRAG_OFFSET = 42;
 const historyState = {
   undo: [],
   redo: [],
@@ -231,6 +238,7 @@ async function applySnapshot(snapshot) {
     state.isSpacePressed = false;
     state.isAnalyzing = false;
     state.hoveredSegmentId = null;
+    state.pendingReferenceId = null;
     nextSegmentId = snapshot.nextSegmentId || Math.max(1, ...state.segments.map((segment) => segment.id + 1), 1);
 
     referenceLengthInput.value = state.referenceValue;
@@ -306,6 +314,7 @@ function updateHistoryButtons() {
   const hasImage = Boolean(state.image);
   const hasSegments = state.segments.length > 0;
   const hasDetected = state.detectedSegments.length > 0;
+  const hasSelection = state.selectedSegmentIds.size > 0;
   undoButton.disabled = historyState.undo.length <= 1;
   redoButton.disabled = historyState.redo.length === 0;
   removeUnderlayButton.disabled = !hasImage;
@@ -314,7 +323,11 @@ function updateHistoryButtons() {
   drawSegmentButton.disabled = !hasImage;
   reanalyzeButton.disabled = !hasImage || state.isAnalyzing;
   exportMenuButton.disabled = !hasImage;
-  clearButton.disabled = !hasSegments;
+  clearButton.disabled = !hasSelection;
+  clearButton.title = hasSelection
+    ? "Удалить выбранный отрезок"
+    : "Сначала выберите отрезок";
+  clearButton.setAttribute("aria-label", clearButton.title);
   if (toggleAllFootnotesButton) {
     toggleAllFootnotesButton.disabled = !hasSegments;
   }
@@ -403,6 +416,9 @@ function updateGuidanceControls() {
   }
   referenceField?.classList.toggle("needs-attention", needsBase || needsLength);
   referenceLengthInput.setAttribute("aria-invalid", String(needsLength && state.referenceValue.trim().length > 0));
+  if (baseConfirm) {
+    baseConfirm.hidden = !state.pendingReferenceId;
+  }
 }
 
 function commitHistory() {
@@ -704,7 +720,7 @@ function distanceToSegment(point, start, end) {
   return Math.hypot(point.x - projection.x, point.y - projection.y);
 }
 
-function findSegmentAt(clientX, clientY, tolerance = 18) {
+function findSegmentAt(clientX, clientY, tolerance = isCoarsePointer() ? 30 : 18) {
   const point = screenPointFromClient(clientX, clientY);
   let closest = null;
   let closestDistance = Infinity;
@@ -739,7 +755,7 @@ function findEndpointAt(clientX, clientY) {
   const point = screenPointFromClient(clientX, clientY);
   let closest = null;
   let closestDistance = Infinity;
-  const hitRadius = window.matchMedia("(pointer: coarse)").matches ? 32 : 16;
+  const hitRadius = isCoarsePointer() ? TOUCH_ENDPOINT_HIT_RADIUS : 16;
 
   for (const segment of state.segments) {
     if (!isSegmentSelected(segment)) continue;
@@ -951,6 +967,10 @@ function isSegmentSelected(segment) {
   return state.selectedSegmentIds.has(segment.id);
 }
 
+function isCoarsePointer() {
+  return window.matchMedia("(pointer: coarse)").matches;
+}
+
 function selectOnlySegment(id) {
   state.selectedSegmentIds = id === null ? new Set() : new Set([id]);
 }
@@ -973,12 +993,23 @@ function clearSelection() {
   state.selectedSegmentIds = new Set();
 }
 
+function adjustedEndpointDragPoint(event) {
+  if (event.pointerType !== "touch") {
+    return { x: event.clientX, y: event.clientY };
+  }
+  return {
+    x: event.clientX,
+    y: event.clientY - TOUCH_ENDPOINT_DRAG_OFFSET,
+  };
+}
+
 function startChoosingBase() {
   if (!state.segments.length) {
     showToast("Сначала добавьте или примите отрезки");
     return;
   }
   state.isChoosingBase = true;
+  state.pendingReferenceId = null;
   state.pendingPoint = null;
   state.previewPoint = null;
   state.orthogonalGuide = null;
@@ -990,8 +1021,10 @@ function startChoosingBase() {
 function setReferenceSegment(id, { focusLength = true } = {}) {
   state.referenceId = id;
   state.isChoosingBase = false;
+  state.pendingReferenceId = null;
   selectOnlySegment(id);
   state.pendingPoint = null;
+  hideBaseConfirmation();
   updateAll();
   commitHistory();
   if (focusLength) {
@@ -1000,13 +1033,43 @@ function setReferenceSegment(id, { focusLength = true } = {}) {
   }
 }
 
-function handleSegmentPick(id) {
+function hideBaseConfirmation() {
+  state.pendingReferenceId = null;
+  if (baseConfirm) {
+    baseConfirm.hidden = true;
+  }
+}
+
+function requestReferenceConfirmation(id) {
+  const segment = state.segments.find((item) => item.id === id);
+  if (!segment || !baseConfirm) return false;
+
+  state.pendingReferenceId = id;
+  selectOnlySegment(id);
+  baseConfirmText.textContent = `${segment.name}: подтвердите выбор базового отрезка.`;
+  baseConfirm.hidden = false;
+  updateAll();
+  return true;
+}
+
+function handleSegmentPick(id, { requireConfirmation = false } = {}) {
   if (state.isChoosingBase || !state.referenceId) {
-    setReferenceSegment(id);
+    if (requireConfirmation && requestReferenceConfirmation(id)) {
+      showToast("Подтвердите базовый отрезок");
+      return true;
+    }
+    setReferenceSegment(id, { focusLength: !isCoarsePointer() });
     showToast("Теперь введите базовый размер");
     return true;
   }
   return false;
+}
+
+function confirmPendingReference() {
+  const id = state.pendingReferenceId;
+  if (!id) return;
+  setReferenceSegment(id, { focusLength: !isCoarsePointer() });
+  showToast("Теперь введите базовый размер");
 }
 
 function getSelectedIds() {
@@ -1695,8 +1758,9 @@ function drawSegment(segment) {
         : CANVAS_COLORS.normal;
   ctx.stroke();
 
-  drawHandle(segment.start, handleColor, isSelected || isHovered ? 6 : 5);
-  drawHandle(segment.end, handleColor, isSelected || isHovered ? 6 : 5);
+  const handleRadius = isCoarsePointer() && isSelected ? 9 : isSelected || isHovered ? 6 : 5;
+  drawHandle(segment.start, handleColor, handleRadius);
+  drawHandle(segment.end, handleColor, handleRadius);
 
   const midpoint = {
     x: (start.x + end.x) / 2,
@@ -1951,7 +2015,7 @@ function drawCanvasHints() {
 
   const rect = canvas.getBoundingClientRect();
   if (!state.segments.length && !state.detectedSegments.length && !state.isAnalyzing) {
-    drawHintPill("Нажмите «Отрезок» и поставьте первую точку", rect.width / 2, rect.height / 2);
+    drawHintPill(isCoarsePointer() ? "Поставьте первую точку" : "Нажмите «Отрезок» и поставьте первую точку", rect.width / 2, rect.height / 2);
   }
 
   if (state.isChoosingBase && state.segments.length) {
@@ -1960,7 +2024,7 @@ function drawCanvasHints() {
 
   if (state.pendingPoint && state.previewPoint) {
     const preview = imageToScreen(state.previewPoint);
-    drawHintPill("Кликните вторую точку", preview.x, preview.y - 28);
+    drawHintPill(isCoarsePointer() ? "Вторая точка" : "Кликните вторую точку", preview.x, preview.y - 28);
   }
 
   if (state.isSpacePressed) {
@@ -2723,7 +2787,7 @@ function updateStatus() {
   const underlayState = state.backgroundVisible ? "" : " · подложка скрыта";
   const drawingState = state.isDrawingSegments ? " · добавление отрезков" : "";
   const baseState = count && !state.referenceId ? " · выберите базовый отрезок" : "";
-  statusText.textContent = `${count} ${plural(count, "отрезок", "отрезка", "отрезков")}${detectedState}${baseState}${underlayState}${drawingState}`;
+  statusText.textContent = `План готов${detectedState}${baseState}${underlayState}${drawingState}`;
 }
 
 function plural(value, one, few, many) {
@@ -2802,6 +2866,9 @@ function deleteSegments(ids) {
     state.referenceValue = "";
     referenceLengthInput.value = "";
     state.isChoosingBase = state.segments.length > 0;
+  }
+  if (idsToDelete.has(state.pendingReferenceId)) {
+    hideBaseConfirmation();
   }
   selectSegments(getSelectedIds().filter((id) => !idsToDelete.has(id)));
   updateAll();
@@ -2908,6 +2975,7 @@ function loadImageFile(file) {
       }
       state.detectedSegments = [];
       state.pendingPoint = null;
+      state.pendingReferenceId = null;
       state.previewPoint = null;
       state.orthogonalGuide = null;
       state.isDrawingSegments = false;
@@ -2975,6 +3043,11 @@ cancelDetectedButton.addEventListener("click", () => {
 focusReferenceButton.addEventListener("click", () => referenceLengthInput.focus());
 focusBaseInputButton.addEventListener("click", () => referenceLengthInput.focus());
 chooseBaseButton.addEventListener("click", startChoosingBase);
+confirmBaseButton?.addEventListener("click", confirmPendingReference);
+cancelBaseButton?.addEventListener("click", () => {
+  hideBaseConfirmation();
+  updateAll();
+});
 
 fitButton.addEventListener("click", () => {
   fitImage();
@@ -3010,18 +3083,13 @@ undoButton.addEventListener("click", undoHistory);
 redoButton.addEventListener("click", redoHistory);
 
 clearButton.addEventListener("click", () => {
-  state.segments = [];
-  state.referenceId = null;
-  state.referenceValue = "";
-  referenceLengthInput.value = "";
-  state.isChoosingBase = false;
-  state.detectedSegments = [];
-  clearSelection();
-  state.pendingPoint = null;
-  state.previewPoint = null;
-  state.orthogonalGuide = null;
-  updateAll();
-  commitHistory();
+  const selectedIds = getSelectedIds();
+  if (!selectedIds.length) {
+    showToast("Выберите отрезок для удаления");
+    return;
+  }
+  deleteSegments(selectedIds);
+  showToast(selectedIds.length === 1 ? "Отрезок удалён" : `Удалено: ${selectedIds.length}`);
 });
 
 copyButton.addEventListener("click", async () => {
@@ -3259,7 +3327,8 @@ canvas.addEventListener("pointermove", (event) => {
     if (state.interactionMode === "endpoint" && state.dragStart.endpoint) {
       const { segment, endpoint } = state.dragStart.endpoint;
       const fixedEndpoint = endpoint === "start" ? segment.end : segment.start;
-      const rawPoint = clampPointToImage(screenToImage(event.clientX, event.clientY));
+      const dragPoint = adjustedEndpointDragPoint(event);
+      const rawPoint = clampPointToImage(screenToImage(dragPoint.x, dragPoint.y));
       const resolved = resolveEndpointPoint(rawPoint, fixedEndpoint, segment.id);
       segment[endpoint] = resolved.point;
       state.snapPoint = resolved.snap;
@@ -3351,7 +3420,7 @@ canvas.addEventListener("pointerup", (event) => {
     }
   } else if (hitLabel || hitSegment) {
     const hitId = (hitLabel || hitSegment).id;
-    if (handleSegmentPick(hitId)) {
+    if (handleSegmentPick(hitId, { requireConfirmation: event.pointerType === "touch" })) {
       state.pendingPoint = null;
       return;
     }
@@ -3482,6 +3551,12 @@ window.addEventListener("keydown", (event) => {
     }
     if (!exportMenu.hidden) {
       setExportMenuOpen(false);
+      event.preventDefault();
+      return;
+    }
+    if (state.pendingReferenceId) {
+      hideBaseConfirmation();
+      updateAll();
       event.preventDefault();
       return;
     }

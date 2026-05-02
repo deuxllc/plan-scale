@@ -2958,3 +2958,190 @@ body.sidebar-collapsed:not(.empty-mode) .workspace {
   border-color: rgba(15, 143, 115, 0.18);
   background: rgba(15, 143, 115, 0.065);
 }
+
+.base-confirm {
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 12px 34px rgba(37, 99, 235, 0.13);
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.base-confirm[hidden] {
+  display: none;
+}
+
+.base-confirm strong {
+  display: block;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.base-confirm span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.base-confirm-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.base-confirm-actions button {
+  min-height: 36px;
+  border-radius: 8px;
+  padding: 0 12px;
+}
+
+@media (max-width: 760px) {
+  .topbar {
+    gap: 7px;
+    padding: calc(36px + env(safe-area-inset-top)) 10px 10px;
+  }
+
+  .topbar::before {
+    top: calc(12px + env(safe-area-inset-top));
+  }
+
+  .plan-group {
+    order: 1;
+    grid-template-columns: var(--mobile-tool) 88px var(--mobile-tool) var(--mobile-tool);
+    flex: 1 1 232px;
+    max-width: 232px;
+    gap: 4px;
+  }
+
+  .plan-upload-button {
+    gap: 4px;
+    padding: 0 8px;
+  }
+
+  .history-group {
+    order: 1;
+    display: grid;
+    grid-template-columns: var(--mobile-tool) var(--mobile-tool);
+    flex: 0 0 calc(var(--mobile-tool) * 2 + 7px);
+    margin-left: auto;
+  }
+
+  .segment-tools-group {
+    order: 2;
+    display: grid;
+    grid-template-columns: repeat(5, var(--mobile-tool));
+    flex: 0 0 calc(var(--mobile-tool) * 5 + 28px);
+    gap: 7px;
+  }
+
+  .export-group {
+    order: 2;
+    flex: 0 0 var(--mobile-tool);
+    margin-left: auto;
+  }
+
+  .measure-group {
+    order: 3;
+    flex: 1 0 100%;
+  }
+
+  .toolbar-group > button,
+  .toolbar-group > .file-button,
+  .toolbar-toggle.icon-only {
+    width: 100%;
+  }
+
+  .toolbar-field {
+    grid-template-columns: 42px minmax(0, 1fr) 58px;
+    gap: 4px;
+    padding: 5px 5px 5px 7px;
+    overflow: visible;
+  }
+
+  .toolbar-field span {
+    font-size: 0;
+    white-space: nowrap;
+  }
+
+  .toolbar-field span::before {
+    content: "База";
+    font-size: 12px;
+    line-height: 1;
+  }
+
+  .toolbar-field input,
+  .toolbar-field select,
+  .segment-name {
+    font-size: 16px;
+  }
+
+  .toolbar-field input,
+  .toolbar-field select {
+    min-width: 0;
+    padding: 4px 6px;
+  }
+
+  .toolbar-field select {
+    padding-right: 18px;
+  }
+
+  .base-confirm {
+    position: relative;
+    z-index: 22;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .base-confirm-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.76fr);
+    gap: 6px;
+  }
+
+  .base-confirm-actions button {
+    min-height: 40px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .toast {
+    z-index: 90;
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 380px) {
+  .topbar {
+    padding-top: calc(36px + env(safe-area-inset-top));
+  }
+
+  .plan-group {
+    flex-basis: 228px;
+    max-width: 228px;
+    grid-template-columns: var(--mobile-tool) 84px var(--mobile-tool) var(--mobile-tool);
+  }
+
+  .history-group {
+    order: 2;
+    margin-left: 0;
+  }
+
+  .segment-tools-group {
+    order: 3;
+  }
+
+  .export-group {
+    order: 3;
+  }
+
+  .measure-group {
+    order: 4;
+  }
+}

@@ -147,7 +147,7 @@
             <button id="reanalyzeButton" class="tool-button icon-only reanalyze-button" type="button" title="Заново найти отрезки на плане" aria-label="Заново найти отрезки на плане">
               <svg class="button-icon"><use href="#icon-reanalyze"></use></svg>
             </button>
-            <button id="clearButton" class="icon-button danger" type="button" title="Удалить все отрезки" aria-label="Удалить все отрезки">
+            <button id="clearButton" class="icon-button danger" type="button" title="Удалить выбранный отрезок" aria-label="Удалить выбранный отрезок">
               <svg class="button-icon"><use href="#icon-trash"></use></svg>
             </button>
             <button id="toggleAllFootnotesButton" class="tool-button icon-only toggle-tool footnote-toggle" type="button" aria-pressed="true" title="Скрыть сноски всех отрезков" aria-label="Скрыть сноски всех отрезков">
@@ -249,6 +249,17 @@
             <span id="calibrationHintText">Кликните по известному отрезку на плане или в списке. После этого введите его реальную длину.</span>
           </div>
           <button id="focusReferenceButton" type="button">Ввести длину</button>
+        </div>
+
+        <div class="base-confirm" id="baseConfirm" role="status" aria-live="polite" hidden>
+          <div>
+            <strong>Сделать базовым?</strong>
+            <span id="baseConfirmText">Подтвердите выбранный отрезок, чтобы случайный тап не задал масштаб.</span>
+          </div>
+          <div class="base-confirm-actions">
+            <button id="confirmBaseButton" class="primary-action" type="button">Подтвердить</button>
+            <button id="cancelBaseButton" type="button">Отмена</button>
+          </div>
         </div>
 
         <div class="canvas-wrap" id="canvasWrap">
