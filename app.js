@@ -13,6 +13,10 @@ const drawSegmentButton = document.querySelector("#drawSegmentButton");
 const reanalyzeButton = document.querySelector("#reanalyzeButton");
 const sidebarToggleButton = document.querySelector("#sidebarToggleButton");
 const sidebarCloseButton = document.querySelector("#sidebarCloseButton");
+const topbar = document.querySelector(".topbar");
+const measureGroup = document.querySelector(".measure-group");
+const historyGroup = document.querySelector(".history-group");
+const baseSection = document.querySelector(".base-section");
 const undoButton = document.querySelector("#undoButton");
 const redoButton = document.querySelector("#redoButton");
 const clearButton = document.querySelector("#clearButton");
@@ -313,6 +317,27 @@ function scheduleViewSave() {
   }, VIEW_SAVE_DELAY);
 }
 
+function isMobileLayout() {
+  return window.matchMedia("(max-width: 760px)").matches;
+}
+
+function hasCompleteBaseLength() {
+  return Boolean(state.referenceId && parseDecimal(state.referenceValue) !== null);
+}
+
+function syncCalibrationPlacement() {
+  if (!measureGroup || !topbar || !baseSection) return;
+
+  const shouldMoveToPanel = isMobileLayout() && hasCompleteBaseLength();
+  const isInPanel = measureGroup.parentElement === baseSection;
+  if (shouldMoveToPanel && !isInPanel) {
+    baseSection.append(measureGroup);
+  } else if (!shouldMoveToPanel && isInPanel) {
+    topbar.insertBefore(measureGroup, historyGroup);
+  }
+  document.body.classList.toggle("base-length-complete", shouldMoveToPanel);
+}
+
 function updateHistoryButtons() {
   const hasImage = Boolean(state.image);
   const hasSegments = state.segments.length > 0;
@@ -387,13 +412,21 @@ function updateToolControls() {
   updateAllFootnotesButtonState();
 
   const hasBase = Boolean(state.referenceId);
+  const baseLengthComplete = hasCompleteBaseLength();
   referenceLengthInput.disabled = !hasBase;
   focusReferenceButton.hidden = !hasBase;
   focusBaseInputButton.disabled = !hasBase;
   chooseBaseButton.disabled = !state.segments.length;
   chooseBaseButton.textContent = hasBase ? "Изменить отрезок" : "Выбрать отрезок";
-  sidebarToggleButton.title = state.sidebarCollapsed ? "Показать список отрезков" : "Скрыть список отрезков";
+  const sidebarLocked = isMobileLayout() && state.image && !baseLengthComplete;
+  sidebarToggleButton.disabled = sidebarLocked;
+  sidebarToggleButton.title = sidebarLocked
+    ? "Сначала выберите базовый отрезок и задайте длину"
+    : state.sidebarCollapsed
+      ? "Показать список отрезков"
+      : "Скрыть список отрезков";
   sidebarToggleButton.setAttribute("aria-label", sidebarToggleButton.title);
+  syncCalibrationPlacement();
 }
 
 function updateGuidanceControls() {
@@ -1778,11 +1811,11 @@ function drawSegment(segment) {
   }
 
   const label = labelTextFor(segment);
-  const labelFontSize = state.scale > 3 ? 7 : 8;
+  const labelFontSize = state.scale > 3 ? 8 : 10;
   ctx.font = `400 ${labelFontSize}px 'DM Sans', Inter, system-ui, sans-serif`;
   const metrics = ctx.measureText(label);
-  const labelWidth = metrics.width + 9;
-  const labelHeight = Math.max(14, labelFontSize + 7);
+  const labelWidth = metrics.width + 12;
+  const labelHeight = Math.max(17, labelFontSize + 8);
   const offset = getLabelOffset(segment, labelWidth, labelHeight);
   const labelCenter = {
     x: midpoint.x + offset.x,
@@ -2169,9 +2202,9 @@ function createExportLayout(viewScale) {
 
   const measureCanvas = document.createElement("canvas");
   const measureContext = measureCanvas.getContext("2d");
-  const fontSize = Math.max(6.5, 7 / viewScale);
-  const horizontalPadding = 7 / viewScale;
-  const labelHeight = 12 / viewScale;
+  const fontSize = Math.max(8, 9 / viewScale);
+  const horizontalPadding = 9 / viewScale;
+  const labelHeight = 15 / viewScale;
   measureContext.font = `400 ${fontSize}px Inter, system-ui, sans-serif`;
 
   for (const segment of state.segments) {
@@ -3215,6 +3248,10 @@ unitInput.addEventListener("change", () => {
 segmentsSortSelect.addEventListener("change", renderSegments);
 
 function setSidebarCollapsed(collapsed) {
+  if (!collapsed && isMobileLayout() && state.image && !hasCompleteBaseLength()) {
+    showToast("Сначала задайте длину базового отрезка");
+    return;
+  }
   state.sidebarCollapsed = collapsed;
   updateToolControls();
   syncCanvasAfterLayout();
@@ -3559,12 +3596,20 @@ smartGridToggle.addEventListener("change", () => {
 
 window.addEventListener("resize", () => {
   window.clearTimeout(resizeTimer);
-  resizeTimer = window.setTimeout(resizeCanvas, 50);
+  resizeTimer = window.setTimeout(() => {
+    syncCalibrationPlacement();
+    updateToolControls();
+    resizeCanvas();
+  }, 50);
 });
 
 window.visualViewport?.addEventListener("resize", () => {
   window.clearTimeout(resizeTimer);
-  resizeTimer = window.setTimeout(resizeCanvas, 50);
+  resizeTimer = window.setTimeout(() => {
+    syncCalibrationPlacement();
+    updateToolControls();
+    resizeCanvas();
+  }, 50);
 });
 
 if (typeof ResizeObserver !== "undefined") {

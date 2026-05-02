@@ -3167,6 +3167,52 @@ body.sidebar-collapsed:not(.empty-mode) .workspace {
   background: linear-gradient(180deg, #ffffff, #f5f8fc);
 }
 
+.history-button .button-icon,
+.sidebar-toggle-button {
+  position: relative;
+  top: -1px;
+}
+
+@media (min-width: 761px) {
+  .topbar {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  .topbar .toolbar-group {
+    flex-wrap: nowrap;
+  }
+
+  .topbar .icon-button,
+  .topbar .tool-button.icon-only,
+  .topbar .toolbar-toggle.icon-only,
+  .topbar #removeUnderlayButton {
+    width: 36px;
+    flex: 0 0 36px;
+  }
+
+  .topbar .measure-group {
+    flex: 0 1 246px;
+    min-width: 218px;
+  }
+
+  .topbar .toolbar-field {
+    width: 100%;
+    grid-template-columns: minmax(92px, max-content) minmax(54px, 1fr) 54px;
+    gap: 4px;
+  }
+
+  body:not(.sidebar-collapsed):not(.empty-mode) #exportMenuButton {
+    width: 36px;
+    min-width: 36px;
+    padding: 0;
+  }
+
+  body:not(.sidebar-collapsed):not(.empty-mode) #exportMenuButton span {
+    display: none;
+  }
+}
+
 .history-button:not(:disabled):hover {
   color: var(--accent);
   border-color: rgba(37, 99, 235, 0.34);
@@ -3493,5 +3539,178 @@ body.sidebar-collapsed:not(.empty-mode) .workspace {
 
   .segment-actions-row {
     grid-template-columns: 44px 44px 44px;
+  }
+}
+
+/* Mobile strict control grid */
+@media (max-width: 760px) {
+  .topbar {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+    align-items: stretch;
+    padding: calc(44px + env(safe-area-inset-top)) 10px 10px;
+  }
+
+  .topbar > .toolbar-group,
+  .topbar > .measure-group,
+  .topbar > .export-group {
+    display: contents;
+  }
+
+  .topbar button,
+  .topbar .file-button,
+  .topbar .toolbar-toggle {
+    width: 100%;
+    height: var(--mobile-tool);
+    min-height: var(--mobile-tool);
+    border-radius: 8px;
+    justify-content: center;
+  }
+
+  #sidebarToggleButton {
+    order: 1;
+    transform: translateY(-1px);
+  }
+
+  .plan-upload-button {
+    order: 2;
+    grid-column: span 2;
+  }
+
+  #undoButton {
+    order: 4;
+  }
+
+  #redoButton {
+    order: 5;
+  }
+
+  #removeUnderlayButton {
+    order: 6;
+  }
+
+  #drawSegmentButton {
+    order: 7;
+  }
+
+  #fitButton {
+    order: 8;
+  }
+
+  #reanalyzeButton {
+    order: 9;
+  }
+
+  #clearButton {
+    order: 10;
+  }
+
+  #toggleAllFootnotesButton {
+    order: 11;
+  }
+
+  .snap-toggle {
+    order: 12;
+  }
+
+  .help-button {
+    order: 14;
+  }
+
+  .export-menu-wrap {
+    order: 15;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .measure-group {
+    order: 20;
+    grid-column: 1 / -1;
+  }
+
+  .toolbar-field {
+    order: 20;
+    grid-column: 1 / -1;
+    height: var(--mobile-tool);
+    min-height: var(--mobile-tool);
+    grid-template-columns: 118px minmax(0, 1fr) 70px;
+    gap: 8px;
+    padding: 5px 7px;
+    border-radius: 8px;
+  }
+
+  .toolbar-field span::before {
+    content: "Базовый отрезок";
+    font-size: 13px;
+    line-height: 1.05;
+  }
+
+  .toolbar-field input,
+  .toolbar-field select {
+    height: 34px;
+    min-height: 34px;
+    border-radius: 7px;
+    font-size: 16px;
+  }
+
+  .topbar .toolbar-toggle.icon-only,
+  .topbar .export-menu-wrap,
+  .topbar .export-menu-wrap #exportMenuButton {
+    width: 100%;
+    min-width: 0;
+    flex-basis: auto;
+  }
+
+  .topbar .icon-button,
+  .topbar .tool-button.icon-only,
+  .topbar .toolbar-toggle.icon-only,
+  .topbar #removeUnderlayButton,
+  .topbar #fitButton,
+  .topbar #drawSegmentButton,
+  .topbar #reanalyzeButton,
+  .topbar #clearButton,
+  .topbar #toggleAllFootnotesButton,
+  .topbar #undoButton,
+  .topbar #redoButton,
+  .topbar #helpButton,
+  .topbar #exportMenuButton {
+    width: 100% !important;
+    flex: 0 0 auto;
+  }
+
+  .base-section > .measure-group {
+    display: block;
+    margin-top: 8px;
+  }
+
+  .base-section > .measure-group .toolbar-field {
+    width: 100%;
+  }
+
+  .history-button .button-icon,
+  .sidebar-toggle-button {
+    position: relative;
+    top: -1px;
+  }
+
+  .sidebar-toggle-button:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+  }
+}
+
+@media (max-width: 380px) {
+  .topbar {
+    gap: 7px;
+  }
+
+  .toolbar-field {
+    grid-template-columns: 108px minmax(0, 1fr) 62px;
+    gap: 6px;
+  }
+
+  .toolbar-field span::before {
+    font-size: 12px;
   }
 }
