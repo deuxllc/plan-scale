@@ -12,6 +12,7 @@ const fitButton = document.querySelector("#fitButton");
 const drawSegmentButton = document.querySelector("#drawSegmentButton");
 const reanalyzeButton = document.querySelector("#reanalyzeButton");
 const sidebarToggleButton = document.querySelector("#sidebarToggleButton");
+const sidebarCloseButton = document.querySelector("#sidebarCloseButton");
 const undoButton = document.querySelector("#undoButton");
 const redoButton = document.querySelector("#redoButton");
 const clearButton = document.querySelector("#clearButton");
@@ -472,7 +473,7 @@ function syncCanvasHeightToViewport() {
   const rect = wrap.getBoundingClientRect();
   const viewportHeight = window.visualViewport?.height || window.innerHeight;
   const isCompact = window.matchMedia("(max-width: 760px)").matches;
-  const minHeight = isCompact ? 180 : 280;
+  const minHeight = isCompact ? 140 : 280;
   const availableHeight = viewportHeight - rect.top - paddingBottom;
   wrap.style.height = `${Math.max(minHeight, Math.floor(availableHeight))}px`;
 }
@@ -2741,7 +2742,11 @@ function updateAll() {
   updateStatus();
   updateGuidanceControls();
   updateHistoryButtons();
-  draw();
+  if (window.matchMedia("(max-width: 760px)").matches) {
+    resizeCanvas();
+  } else {
+    draw();
+  }
 }
 
 function addPoint(point) {
@@ -3122,6 +3127,7 @@ function setSidebarCollapsed(collapsed) {
 }
 
 sidebarToggleButton.addEventListener("click", () => setSidebarCollapsed(!state.sidebarCollapsed));
+sidebarCloseButton?.addEventListener("click", () => setSidebarCollapsed(true));
 if (toggleAllFootnotesButton) {
   toggleAllFootnotesButton.addEventListener("click", toggleAllFootnotes);
 }
