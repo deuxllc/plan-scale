@@ -2414,6 +2414,112 @@ body.sidebar-collapsed:not(.empty-mode) .workspace {
   stroke-width: 1.65;
 }
 
+@media (max-width: 760px) {
+  html,
+  body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  .app-shell,
+  body.empty-mode .app-shell,
+  body:not(.empty-mode) .app-shell {
+    height: 100svh;
+    padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  }
+
+  .workspace,
+  body:not(.empty-mode) .workspace,
+  body.sidebar-collapsed:not(.empty-mode) .workspace {
+    min-height: 0;
+    gap: 8px;
+    grid-template-rows: auto auto auto auto minmax(0, 1fr);
+  }
+
+  .topbar {
+    max-height: min(42svh, 270px);
+    overflow: auto;
+    align-content: flex-start;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .canvas-wrap,
+  body.empty-mode .canvas-wrap,
+  body:not(.empty-mode) .canvas-wrap {
+    min-height: 220px;
+    height: 100%;
+    border-radius: 7px;
+  }
+
+  #planCanvas {
+    touch-action: none;
+  }
+
+  .panel,
+  body:not(.empty-mode):not(.sidebar-collapsed) .panel {
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    max-height: min(58svh, 520px);
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .export-menu {
+    position: fixed;
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    top: auto;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: auto;
+    max-height: min(62svh, 430px);
+    overflow: auto;
+    z-index: 40;
+  }
+
+  .cursor-coordinates {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  button,
+  .file-button {
+    min-height: 38px;
+    font-size: 13px;
+  }
+
+  .plan-group {
+    grid-template-columns: 38px minmax(0, 1fr) 38px 38px;
+    min-width: 0;
+  }
+
+  .segment-tools-group,
+  .history-group,
+  .export-group {
+    flex: 1 1 auto;
+  }
+
+  .measure-group {
+    min-width: 0;
+  }
+
+  .toolbar-field {
+    grid-template-columns: 1fr minmax(86px, 1fr) minmax(64px, 0.7fr);
+  }
+
+  .toolbar-field span {
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .status {
+    display: none;
+  }
+}
+
 #reanalyzeButton .button-icon,
 #drawSegmentButton .button-icon,
 .footnote-button .button-icon,

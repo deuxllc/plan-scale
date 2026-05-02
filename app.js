@@ -114,12 +114,20 @@ let resizeTimer = 0;
 const MAX_AUTO_SEGMENTS = 150;
 const STORAGE_KEY = "planscale-state-v4";
 const VIEW_SAVE_DELAY = 220;
+const MIN_VIEW_SCALE = 0.05;
+const MAX_VIEW_SCALE = 12;
+const TOUCH_LONG_PRESS_MS = 560;
 const historyState = {
   undo: [],
   redo: [],
   restoring: false,
 };
 let viewSaveTimer = 0;
+const activePointers = new Map();
+let pinchGesture = null;
+let longPressTimer = 0;
+let longPressSegment = null;
+let touchContextMenuOpened = false;
 
 function setUnitInputValue(value) {
   const unit = value || "м";
@@ -462,8 +470,11 @@ function syncCanvasHeightToViewport() {
   const shellStyle = window.getComputedStyle(appShell);
   const paddingBottom = Number.parseFloat(shellStyle.paddingBottom) || 0;
   const rect = wrap.getBoundingClientRect();
-  const availableHeight = window.innerHeight - rect.top - paddingBottom;
-  wrap.style.height = `${Math.max(280, Math.floor(availableHeight))}px`;
+  const viewportHeight = window.visualViewport?.height || window.innerHeight;
+  const isCompact = window.matchMedia("(max-width: 760px)").matches;
+  const minHeight = isCompact ? 180 : 280;
+  const availableHeight = viewportHeight - rect.top - paddingBottom;
+  wrap.style.height = `${Math.max(minHeight, Math.floor(availableHeight))}px`;
 }
 
 function resizeCanvas() {
@@ -500,6 +511,111 @@ function normalizedWheelDelta(value, deltaMode) {
   if (deltaMode === 1) return value * 16;
   if (deltaMode === 2) return value * wrap.getBoundingClientRect().height;
   return value;
+}
+
+function clampViewScale(scale) {
+  return Math.min(Math.max(scale, MIN_VIEW_SCALE), MAX_VIEW_SCALE);
+}
+
+function zoomAtClientPoint(clientX, clientY, factor) {
+  const screen = screenPointFromClient(clientX, clientY);
+  const before = screenToImage(clientX, clientY);
+  state.scale = clampViewScale(state.scale * factor);
+  state.offsetX = screen.x - before.x * state.scale;
+  state.offsetY = screen.y - before.y * state.scale;
+}
+
+function pointerPairMetrics() {
+  const pointers = Array.from(activePointers.values()).slice(0, 2);
+  if (pointers.length < 2) return null;
+  const [first, second] = pointers;
+  const center = {
+    x: (first.clientX + second.clientX) / 2,
+    y: (first.clientY + second.clientY) / 2,
+  };
+  return {
+    center,
+    distance: Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY),
+  };
+}
+
+function clearLongPressTimer() {
+  window.clearTimeout(longPressTimer);
+  longPressTimer = 0;
+  longPressSegment = null;
+}
+
+function resetTransientGestureState(mode = null) {
+  state.isDragging = false;
+  state.dragStart = null;
+  state.didDrag = false;
+  state.interactionMode = mode;
+  state.selectionBox = null;
+  state.snapPoint = null;
+  state.previewPoint = null;
+  state.orthogonalGuide = null;
+  state.alignmentGuide = null;
+  canvas.classList.remove("dragging");
+}
+
+function safeSetPointerCapture(pointerId) {
+  try {
+    canvas.setPointerCapture(pointerId);
+  } catch {
+    // Some mobile WebViews can reject capture while still delivering pointer events.
+  }
+}
+
+function safeReleasePointerCapture(pointerId) {
+  try {
+    if (canvas.hasPointerCapture(pointerId)) {
+      canvas.releasePointerCapture(pointerId);
+    }
+  } catch {
+    // Pointer capture may already be gone after touch cancellation.
+  }
+}
+
+function startPinchGesture() {
+  const metrics = pointerPairMetrics();
+  if (!metrics || metrics.distance < 1) return;
+  pinchGesture = {
+    distance: metrics.distance,
+  };
+  clearLongPressTimer();
+  resetTransientGestureState("pinch");
+}
+
+function updatePointerFromEvent(event) {
+  if (event.pointerType !== "touch") return;
+  activePointers.set(event.pointerId, {
+    clientX: event.clientX,
+    clientY: event.clientY,
+  });
+}
+
+function removePointerFromEvent(event) {
+  if (event.pointerType !== "touch") return;
+  activePointers.delete(event.pointerId);
+  if (activePointers.size < 2) {
+    pinchGesture = null;
+  }
+}
+
+function scheduleTouchContextMenu(segment, event) {
+  clearLongPressTimer();
+  if (!segment || event.pointerType !== "touch" || state.isDrawingSegments || state.isChoosingBase) return;
+  const { clientX, clientY } = event;
+  longPressSegment = segment;
+  longPressTimer = window.setTimeout(() => {
+    if (!longPressSegment || activePointers.size > 1) return;
+    selectOnlySegment(longPressSegment.id);
+    resetTransientGestureState(null);
+    touchContextMenuOpened = true;
+    updateAll();
+    showSegmentContextMenu(longPressSegment, clientX, clientY);
+    longPressSegment = null;
+  }, TOUCH_LONG_PRESS_MS);
 }
 
 function canvasLogicalSize() {
@@ -3012,14 +3128,29 @@ if (toggleAllFootnotesButton) {
 
 canvas.addEventListener("pointerdown", (event) => {
   if (!state.image) return;
-  const wantsPan = event.button === 1 || state.isSpacePressed;
-  const hitEndpoint = findEndpointAt(event.clientX, event.clientY);
-  const hitLabel = wantsPan || hitEndpoint ? null : findLabelAt(event.clientX, event.clientY);
-  const hitSegment = wantsPan || hitEndpoint || hitLabel ? null : findSegmentAt(event.clientX, event.clientY);
+  updatePointerFromEvent(event);
+  safeSetPointerCapture(event.pointerId);
+  if (event.pointerType === "touch" && activePointers.size >= 2) {
+    event.preventDefault();
+    startPinchGesture();
+    updateAll();
+    return;
+  }
 
-  canvas.setPointerCapture(event.pointerId);
+  const hitEndpoint = findEndpointAt(event.clientX, event.clientY);
+  const hitLabel = hitEndpoint ? null : findLabelAt(event.clientX, event.clientY);
+  const hitSegment = hitEndpoint || hitLabel ? null : findSegmentAt(event.clientX, event.clientY);
+  const touchEmptyPan = event.pointerType === "touch"
+    && !state.isDrawingSegments
+    && !state.isChoosingBase
+    && !hitEndpoint
+    && !hitLabel
+    && !hitSegment;
+  const wantsPan = event.button === 1 || state.isSpacePressed || touchEmptyPan;
+
   state.isDragging = true;
   state.didDrag = false;
+  touchContextMenuOpened = false;
   state.snapPoint = null;
   state.orthogonalGuide = null;
   state.alignmentGuide = null;
@@ -3064,11 +3195,26 @@ canvas.addEventListener("pointerdown", (event) => {
     labelSegment: hitLabel,
     labelOffset: hitLabel ? currentLabelOffset(hitLabel) : { x: 0, y: -36 },
   };
+  scheduleTouchContextMenu(hitLabel || hitSegment, event);
   updateAll();
   canvas.classList.add("dragging");
 });
 
 canvas.addEventListener("pointermove", (event) => {
+  updatePointerFromEvent(event);
+  if (pinchGesture && event.pointerType === "touch" && activePointers.size >= 2) {
+    event.preventDefault();
+    const metrics = pointerPairMetrics();
+    if (metrics && metrics.distance >= 1) {
+      const factor = metrics.distance / Math.max(pinchGesture.distance, 1);
+      zoomAtClientPoint(metrics.center.x, metrics.center.y, factor);
+      pinchGesture.distance = metrics.distance;
+      draw();
+      scheduleViewSave();
+    }
+    return;
+  }
+
   updateCursorCoordinates(event.clientX, event.clientY);
 
   if (!state.isDragging || !state.dragStart) {
@@ -3099,6 +3245,9 @@ canvas.addEventListener("pointermove", (event) => {
   const distance = Math.hypot(dx, dy);
 
   if (distance > 4) {
+    if (distance > 10) {
+      clearLongPressTimer();
+    }
     state.didDrag = true;
 
     if (state.interactionMode === "endpoint" && state.dragStart.endpoint) {
@@ -3141,7 +3290,23 @@ canvas.addEventListener("pointermove", (event) => {
 
 canvas.addEventListener("pointerup", (event) => {
   if (!state.image) return;
-  canvas.releasePointerCapture(event.pointerId);
+  clearLongPressTimer();
+  removePointerFromEvent(event);
+  safeReleasePointerCapture(event.pointerId);
+  if (touchContextMenuOpened) {
+    touchContextMenuOpened = false;
+    resetTransientGestureState(null);
+    state.lastPointerUpAt = performance.now();
+    draw();
+    return;
+  }
+  if (pinchGesture || state.interactionMode === "pinch") {
+    resetTransientGestureState(null);
+    state.lastPointerUpAt = performance.now();
+    scheduleViewSave();
+    draw();
+    return;
+  }
   canvas.classList.remove("dragging");
   state.lastPointerUpAt = performance.now();
 
@@ -3229,6 +3394,15 @@ canvas.addEventListener("pointerleave", () => {
   draw();
 });
 
+canvas.addEventListener("pointercancel", (event) => {
+  clearLongPressTimer();
+  removePointerFromEvent(event);
+  if (state.interactionMode === "pinch" || activePointers.size === 0) {
+    resetTransientGestureState(null);
+    draw();
+  }
+});
+
 canvas.addEventListener("wheel", (event) => {
   if (!state.image) return;
   event.preventDefault();
@@ -3249,15 +3423,9 @@ canvas.addEventListener("wheel", (event) => {
     return;
   }
 
-  const mouse = screenPointFromClient(event.clientX, event.clientY);
-  const mouseX = mouse.x;
-  const mouseY = mouse.y;
-  const before = screenToImage(event.clientX, event.clientY);
   const rawFactor = Math.exp(-deltaY * 0.0025);
   const factor = Math.min(Math.max(rawFactor, 0.75), 1.33);
-  state.scale = Math.min(Math.max(state.scale * factor, 0.05), 12);
-  state.offsetX = mouseX - before.x * state.scale;
-  state.offsetY = mouseY - before.y * state.scale;
+  zoomAtClientPoint(event.clientX, event.clientY, factor);
   draw();
   scheduleViewSave();
 }, { passive: false });
@@ -3269,6 +3437,11 @@ smartGridToggle.addEventListener("change", () => {
 });
 
 window.addEventListener("resize", () => {
+  window.clearTimeout(resizeTimer);
+  resizeTimer = window.setTimeout(resizeCanvas, 50);
+});
+
+window.visualViewport?.addEventListener("resize", () => {
   window.clearTimeout(resizeTimer);
   resizeTimer = window.setTimeout(resizeCanvas, 50);
 });
