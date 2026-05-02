@@ -40,6 +40,9 @@ const exportSvgButton = document.querySelector("#exportSvgButton");
 const exportCsvButton = document.querySelector("#exportCsvButton");
 const exportJsonButton = document.querySelector("#exportJsonButton");
 const copyShareLinkButton = document.querySelector("#copyShareLinkButton");
+const helpButton = document.querySelector("#helpButton");
+const helpPopover = document.querySelector("#helpPopover");
+const helpCloseButton = document.querySelector("#helpCloseButton");
 const welcomeOverlay = document.querySelector("#welcomeOverlay");
 const welcomeStartButton = document.querySelector("#welcomeStartButton");
 const emptyUploadButton = document.querySelector("#emptyUploadButton");
@@ -1550,7 +1553,9 @@ function analyzeImageSegments({ automatic = false } = {}) {
 
     if (!foundSegments.length) {
       updateAll();
-      showToast(automatic ? "Линии не найдены, нарисуйте отрезки вручную" : "Автоотрезки не найдены");
+      if (!automatic) {
+        showToast("Автоотрезки не найдены");
+      }
       return;
     }
 
@@ -2350,6 +2355,16 @@ function toggleExportMenu() {
   setExportMenuOpen(exportMenu.hidden);
 }
 
+function setHelpOpen(open) {
+  if (!helpPopover || !helpButton) return;
+  helpPopover.hidden = !open;
+  helpButton.setAttribute("aria-expanded", String(open));
+}
+
+function toggleHelp() {
+  setHelpOpen(helpPopover?.hidden !== false);
+}
+
 function hideSegmentContextMenu() {
   segmentContextMenu.hidden = true;
   activeContextSegmentId = null;
@@ -2987,7 +3002,6 @@ function loadImageFile(file) {
       fitImage();
       updateAll();
       commitHistory();
-      showToast("План загружен");
       if (!preserveExistingMarkup) {
         window.setTimeout(() => analyzeImageSegments({ automatic: true }), 180);
       }
@@ -3123,6 +3137,7 @@ toggleSegmentsButton.addEventListener("click", () => {
 
 exportMenuButton.addEventListener("click", (event) => {
   event.stopPropagation();
+  setHelpOpen(false);
   toggleExportMenu();
 });
 exportPngButton.addEventListener("click", () => exportPng(false));
@@ -3133,10 +3148,21 @@ exportSvgButton.addEventListener("click", exportSvg);
 exportCsvButton.addEventListener("click", exportCsv);
 exportJsonButton.addEventListener("click", exportJson);
 copyShareLinkButton.addEventListener("click", copyShareLink);
+helpButton?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  setExportMenuOpen(false);
+  toggleHelp();
+});
+helpCloseButton?.addEventListener("click", () => setHelpOpen(false));
 
 document.addEventListener("click", (event) => {
   if (!segmentContextMenu.hidden && event.target instanceof Node && !segmentContextMenu.contains(event.target)) {
     hideSegmentContextMenu();
+  }
+  if (helpPopover && !helpPopover.hidden) {
+    if (event.target instanceof Node && helpPopover.contains(event.target)) return;
+    if (event.target instanceof Node && helpButton?.contains(event.target)) return;
+    setHelpOpen(false);
   }
   if (exportMenu.hidden) return;
   if (event.target instanceof Node && exportMenu.contains(event.target)) return;
@@ -3214,9 +3240,14 @@ canvas.addEventListener("pointerdown", (event) => {
   const hitEndpoint = findEndpointAt(event.clientX, event.clientY);
   const hitLabel = hitEndpoint ? null : findLabelAt(event.clientX, event.clientY);
   const hitSegment = hitEndpoint || hitLabel ? null : findSegmentAt(event.clientX, event.clientY);
-  const touchEmptyPan = event.pointerType === "touch"
+  const touchInput = event.pointerType === "touch";
+  const touchBasePick = touchInput
+    && state.isChoosingBase
     && !state.isDrawingSegments
-    && !state.isChoosingBase
+    && !hitEndpoint
+    && (hitLabel || hitSegment);
+  const touchEmptyPan = touchInput
+    && !state.isDrawingSegments
     && !hitEndpoint
     && !hitLabel
     && !hitSegment;
@@ -3233,6 +3264,11 @@ canvas.addEventListener("pointerdown", (event) => {
   if (wantsPan) {
     state.pendingPoint = null;
     state.interactionMode = "pan";
+  } else if (touchBasePick) {
+    const target = hitLabel || hitSegment;
+    selectOnlySegment(target.id);
+    state.pendingPoint = null;
+    state.interactionMode = "base-pick";
   } else if (hitEndpoint) {
     selectOnlySegment(hitEndpoint.segment.id);
     state.pendingPoint = null;
@@ -3267,6 +3303,7 @@ canvas.addEventListener("pointerdown", (event) => {
     offsetY: state.offsetY,
     endpoint: hitEndpoint,
     labelSegment: hitLabel,
+    hitSegment: hitLabel || hitSegment,
     labelOffset: hitLabel ? currentLabelOffset(hitLabel) : { x: 0, y: -36 },
   };
   scheduleTouchContextMenu(hitLabel || hitSegment, event);
@@ -3343,6 +3380,9 @@ canvas.addEventListener("pointermove", (event) => {
         y: state.dragStart.labelOffset.y + dy,
       };
       draw();
+    } else if (state.interactionMode === "base-pick") {
+      state.offsetX = state.dragStart.offsetX + dx;
+      state.offsetY = state.dragStart.offsetY + dy;
     } else if (state.interactionMode === "segment") {
       state.selectionBox = null;
       draw();
@@ -3390,6 +3430,7 @@ canvas.addEventListener("pointerup", (event) => {
   const hitLabel = wasClick ? findLabelAt(event.clientX, event.clientY) : null;
   const hitSegment = wasClick && !hitLabel ? findSegmentAt(event.clientX, event.clientY) : null;
   const completedMode = state.interactionMode;
+  const completedDragStart = state.dragStart;
   const shouldAddPoint = state.isDrawingSegments && wasClick && !hitLabel && !hitSegment && completedMode !== "endpoint";
   state.isDragging = false;
   state.dragStart = null;
@@ -3408,7 +3449,12 @@ canvas.addEventListener("pointerup", (event) => {
     state.selectionBox = null;
     state.pendingPoint = null;
     updateAll();
-  } else if (completedMode === "pan") {
+  } else if (completedMode === "base-pick" && wasClick && completedDragStart?.hitSegment) {
+    if (handleSegmentPick(completedDragStart.hitSegment.id, { requireConfirmation: event.pointerType === "touch" })) {
+      state.pendingPoint = null;
+      return;
+    }
+  } else if (completedMode === "pan" || completedMode === "base-pick") {
     scheduleViewSave();
   } else if (hadSelectionBox) {
     const selectedCount = state.selectedSegmentIds.size;
@@ -3551,6 +3597,11 @@ window.addEventListener("keydown", (event) => {
     }
     if (!exportMenu.hidden) {
       setExportMenuOpen(false);
+      event.preventDefault();
+      return;
+    }
+    if (helpPopover && !helpPopover.hidden) {
+      setHelpOpen(false);
       event.preventDefault();
       return;
     }

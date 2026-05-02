@@ -99,6 +99,19 @@
         <path d="m7 14.8 3.2-3.2 2.3 2.3 2.3-3 2.2 2.7" />
         <path d="M5 20 20 4" stroke-width="1.25" />
       </symbol>
+      <symbol id="icon-help" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M9.6 9.2a2.6 2.6 0 0 1 5 .9c0 1.9-2.6 2.1-2.6 4" />
+        <path d="M12 17.2v.1" />
+      </symbol>
+      <symbol id="icon-undo" viewBox="0 0 24 24">
+        <path d="M9 7 5 11l4 4" />
+        <path d="M5 11h8.3A5.2 5.2 0 1 1 9 19" />
+      </symbol>
+      <symbol id="icon-redo" viewBox="0 0 24 24">
+        <path d="m15 7 4 4-4 4" />
+        <path d="M19 11h-8.3A5.2 5.2 0 1 0 15 19" />
+      </symbol>
     </svg>
 
     <div class="welcome-overlay" id="welcomeOverlay" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
@@ -128,12 +141,6 @@
             <button id="removeUnderlayButton" class="tool-button icon-only toggle-tool" type="button" title="Убрать загруженную подложку, оставив разметку" aria-label="Скрыть подложку" aria-pressed="false">
               <svg class="button-icon"><use href="#icon-hide-image"></use></svg>
             </button>
-            <button id="fitButton" class="tool-button icon-only" type="button" title="Показать весь план" aria-label="Показать весь план">
-              <svg class="button-icon"><use href="#icon-fit"></use></svg>
-            </button>
-          </div>
-
-          <div class="toolbar-group compact segment-tools-group" aria-label="Инструменты отрезков">
             <button
               id="drawSegmentButton"
               class="tool-button icon-only toggle-tool"
@@ -143,6 +150,12 @@
               title="Добавить отрезок"
             >
               <svg class="button-icon"><use href="#icon-add-segment"></use></svg>
+            </button>
+          </div>
+
+          <div class="toolbar-group compact segment-tools-group" aria-label="Инструменты отрезков">
+            <button id="fitButton" class="tool-button icon-only" type="button" title="Показать весь план" aria-label="Показать весь план">
+              <svg class="button-icon"><use href="#icon-fit"></use></svg>
             </button>
             <button id="reanalyzeButton" class="tool-button icon-only reanalyze-button" type="button" title="Заново найти отрезки на плане" aria-label="Заново найти отрезки на плане">
               <svg class="button-icon"><use href="#icon-reanalyze"></use></svg>
@@ -179,11 +192,18 @@
           </div>
 
           <div class="toolbar-group compact history-group">
-            <button id="undoButton" class="icon-button" type="button" title="Отменить действие" aria-label="Отменить действие">↶</button>
-            <button id="redoButton" class="icon-button" type="button" title="Вернуть действие" aria-label="Вернуть действие">↷</button>
+            <button id="undoButton" class="icon-button history-button" type="button" title="Отменить действие" aria-label="Отменить действие">
+              <svg class="button-icon"><use href="#icon-undo"></use></svg>
+            </button>
+            <button id="redoButton" class="icon-button history-button" type="button" title="Вернуть действие" aria-label="Вернуть действие">
+              <svg class="button-icon"><use href="#icon-redo"></use></svg>
+            </button>
           </div>
 
           <div class="toolbar-group export-group" aria-label="Экспорт">
+            <button id="helpButton" class="tool-button icon-only help-button" type="button" title="Помощь по управлению" aria-label="Помощь по управлению" aria-expanded="false">
+              <svg class="button-icon"><use href="#icon-help"></use></svg>
+            </button>
             <div class="export-menu-wrap">
               <button id="exportMenuButton" class="tool-button" type="button" title="Экспортировать разметку" aria-haspopup="true" aria-expanded="false">
                 <svg class="button-icon"><use href="#icon-share"></use></svg>
@@ -278,6 +298,19 @@
           <button type="button" data-action="base" role="menuitem">Сделать базовым</button>
           <button type="button" data-action="rename" role="menuitem">Переименовать</button>
           <button type="button" data-action="delete" role="menuitem">Удалить</button>
+        </div>
+
+        <div class="help-popover" id="helpPopover" role="dialog" aria-modal="false" aria-labelledby="helpTitle" hidden>
+          <div class="help-popover-card">
+            <button id="helpCloseButton" class="icon-button help-close-button" type="button" aria-label="Закрыть помощь">×</button>
+            <strong id="helpTitle">Помощь</strong>
+            <ul>
+              <li>Два пальца: масштаб плана.</li>
+              <li>Потянуть пустое место: переместить план.</li>
+              <li>Тап по отрезку: выбрать или подтвердить базовый.</li>
+              <li>Потянуть точку выбранного отрезка: изменить край.</li>
+            </ul>
+          </div>
         </div>
       </section>
 
