@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>PlanScale</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;600&family=DM+Sans:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+      <symbol id="icon-upload" viewBox="0 0 24 24">
+        <path d="M12 3v12" />
+        <path d="m7 8 5-5 5 5" />
+        <path d="M5 17v3h14v-3" />
+      </symbol>
+      <symbol id="icon-fit" viewBox="0 0 24 24">
+        <path d="M8 3H3v5" />
+        <path d="M16 3h5v5" />
+        <path d="M8 21H3v-5" />
+        <path d="M16 21h5v-5" />
+        <path d="M3 3l6 6" />
+        <path d="M21 3l-6 6" />
+        <path d="M3 21l6-6" />
+        <path d="M21 21l-6-6" />
+      </symbol>
+      <symbol id="icon-scan" viewBox="0 0 24 24">
+        <path d="M4 7V4h3" />
+        <path d="M17 4h3v3" />
+        <path d="M20 17v3h-3" />
+        <path d="M7 20H4v-3" />
+        <path d="M6 12h12" />
+        <path d="M8 9h8" />
+        <path d="M8 15h8" />
+      </symbol>
+      <symbol id="icon-hand" viewBox="0 0 24 24">
+        <path d="M8 12V5a2 2 0 0 1 4 0v6" />
+        <path d="M12 11V4a2 2 0 0 1 4 0v8" />
+        <path d="M16 12V7a2 2 0 0 1 4 0v7c0 4-3 7-7 7h-1c-3 0-5-2-6-5l-2-5a2 2 0 0 1 4-1l1 2" />
+      </symbol>
+      <symbol id="icon-segment" viewBox="0 0 24 24">
+        <path d="M6 18 18 6" />
+        <circle cx="6" cy="18" r="2" />
+        <circle cx="18" cy="6" r="2" />
+      </symbol>
+      <symbol id="icon-add-segment" viewBox="0 0 24 24">
+        <path d="M5.5 17.5 15.5 7.5" />
+        <circle cx="5.5" cy="17.5" r="1.8" />
+        <circle cx="15.5" cy="7.5" r="1.8" />
+        <path d="M18 14.5v5" />
+        <path d="M15.5 17h5" />
+      </symbol>
+      <symbol id="icon-select" viewBox="0 0 24 24">
+        <path d="M5 5h14v14H5z" stroke-dasharray="4 3" />
+        <path d="m13 13 6 6" />
+      </symbol>
+      <symbol id="icon-ortho" viewBox="0 0 24 24">
+        <path d="M7 17h10" />
+        <path d="M7 17V7" />
+        <rect x="7" y="12" width="5" height="5" opacity="0.34" stroke-width="1.25" />
+      </symbol>
+      <symbol id="icon-footnote" viewBox="0 0 24 24">
+        <rect x="4" y="4.2" width="15" height="9" rx="3.2" />
+        <path d="M10.4 17 14.2 13.2" />
+      </symbol>
+      <symbol id="icon-reanalyze" viewBox="0 0 24 24">
+        <circle cx="10.5" cy="10.5" r="6.2" />
+        <path d="m15.2 15.2 4.4 4.4" />
+        <path d="M7.8 12.4 12.8 8.4" opacity="0.58" />
+        <circle cx="7.8" cy="12.4" r="0.95" opacity="0.58" />
+        <circle cx="12.8" cy="8.4" r="0.95" opacity="0.58" />
+      </symbol>
+      <symbol id="icon-app" viewBox="0 0 24 24">
+        <path d="M4 18V6h16v12H4z" />
+        <path d="M8 15h8" />
+        <circle cx="8" cy="15" r="1.6" />
+        <circle cx="16" cy="15" r="1.6" />
+        <path d="M7 9h5" />
+        <path d="M12 9v4" />
+        <path d="M16 8h2v2" />
+      </symbol>
+      <symbol id="icon-share" viewBox="0 0 24 24">
+        <path d="M12 15V3" />
+        <path d="m7 8 5-5 5 5" />
+        <path d="M5 12v8h14v-8" />
+      </symbol>
+      <symbol id="icon-trash" viewBox="0 0 24 24">
+        <path d="M4 7h16" />
+        <path d="M10 11v6" />
+        <path d="M14 11v6" />
+        <path d="M6 7l1 14h10l1-14" />
+        <path d="M9 7V4h6v3" />
+      </symbol>
+      <symbol id="icon-hide-image" viewBox="0 0 24 24">
+        <rect x="4" y="5" width="16" height="12" rx="2.8" />
+        <path d="m7 14.8 3.2-3.2 2.3 2.3 2.3-3 2.2 2.7" />
+        <path d="M5 20 20 4" stroke-width="1.25" />
+      </symbol>
+      <symbol id="icon-help" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M9.6 9.2a2.6 2.6 0 0 1 5 .9c0 1.9-2.6 2.1-2.6 4" />
+        <path d="M12 17.2v.1" />
+      </symbol>
+      <symbol id="icon-undo" viewBox="0 0 24 24">
+        <path d="M9 7 5 11l4 4" />
+        <path d="M5 11h8.3A5.2 5.2 0 1 1 9 19" />
+      </symbol>
+      <symbol id="icon-redo" viewBox="0 0 24 24">
+        <path d="m15 7 4 4-4 4" />
+        <path d="M19 11h-8.3A5.2 5.2 0 1 0 15 19" />
+      </symbol>
+    </svg>
+
+    <div class="welcome-overlay" id="welcomeOverlay" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+      <section class="welcome-card">
+        <div class="welcome-brand">
+          <span class="app-mark" aria-hidden="true"><svg class="app-mark-icon"><use href="#icon-app"></use></svg></span>
+          <strong>PlanScale</strong>
+        </div>
+        <h1 id="welcomeTitle">Реальные размеры по плану</h1>
+        <p>
+          Загрузите планировку, отметьте отрезки и задайте одну известную длину — PlanScale рассчитает остальные размеры по пропорциям.
+        </p>
+        <button id="welcomeStartButton" class="primary-action" type="button">Начать работу</button>
+      </section>
+    </div>
+
+    <main class="app-shell">
+      <section class="workspace" aria-label="Рабочая область плана">
+        <div class="topbar">
+          <div class="toolbar-group plan-group">
+            <button id="sidebarToggleButton" class="icon-button sidebar-toggle-button" type="button" title="Показать список отрезков" aria-label="Показать список отрезков">☰</button>
+            <label class="file-button tool-button plan-upload-button" title="Загрузить изображение планировки">
+              <input id="imageInput" type="file" accept="image/*" />
+              <svg class="button-icon"><use href="#icon-upload"></use></svg>
+              <span>План</span>
+            </label>
+            <button id="removeUnderlayButton" class="tool-button icon-only toggle-tool" type="button" title="Убрать загруженную подложку, оставив разметку" aria-label="Скрыть подложку" aria-pressed="false">
+              <svg class="button-icon"><use href="#icon-hide-image"></use></svg>
+            </button>
+            <button
+              id="drawSegmentButton"
+              class="tool-button icon-only toggle-tool"
+              type="button"
+              aria-pressed="false"
+              aria-label="Добавить отрезок"
+              title="Добавить отрезок"
+            >
+              <svg class="button-icon"><use href="#icon-add-segment"></use></svg>
+            </button>
+          </div>
+
+          <div class="toolbar-group compact segment-tools-group" aria-label="Инструменты отрезков">
+            <button id="fitButton" class="tool-button icon-only" type="button" title="Показать весь план" aria-label="Показать весь план">
+              <svg class="button-icon"><use href="#icon-fit"></use></svg>
+            </button>
+            <button id="reanalyzeButton" class="tool-button icon-only reanalyze-button" type="button" title="Заново найти отрезки на плане" aria-label="Заново найти отрезки на плане">
+              <svg class="button-icon"><use href="#icon-reanalyze"></use></svg>
+            </button>
+            <button id="clearButton" class="icon-button danger" type="button" title="Удалить выбранный отрезок" aria-label="Удалить выбранный отрезок">
+              <svg class="button-icon"><use href="#icon-trash"></use></svg>
+            </button>
+            <button id="toggleAllFootnotesButton" class="tool-button icon-only toggle-tool footnote-toggle" type="button" aria-pressed="true" title="Скрыть сноски всех отрезков" aria-label="Скрыть сноски всех отрезков">
+              <svg class="button-icon"><use href="#icon-footnote"></use></svg>
+            </button>
+            <label class="toolbar-toggle snap-toggle icon-only" title="Ортогональный режим: горизонтали, вертикали и выравнивание по точкам">
+              <input id="smartGridToggle" type="checkbox" />
+              <span><svg class="button-icon"><use href="#icon-ortho"></use></svg></span>
+            </label>
+          </div>
+
+          <div class="toolbar-group measure-group">
+            <div class="toolbar-field" aria-label="Размер базового отрезка">
+              <span>Базовый размер</span>
+              <input
+                id="referenceLengthInput"
+                type="text"
+                inputmode="decimal"
+                autocomplete="off"
+                placeholder="длина"
+              />
+              <select id="unitInput" autocomplete="off" aria-label="Единица измерения">
+                <option value="м" selected>м</option>
+                <option value="см">см</option>
+                <option value="мм">мм</option>
+                <option value="км">км</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="toolbar-group compact history-group">
+            <button id="undoButton" class="icon-button history-button" type="button" title="Отменить действие" aria-label="Отменить действие">
+              <svg class="button-icon"><use href="#icon-undo"></use></svg>
+            </button>
+            <button id="redoButton" class="icon-button history-button" type="button" title="Вернуть действие" aria-label="Вернуть действие">
+              <svg class="button-icon"><use href="#icon-redo"></use></svg>
+            </button>
+          </div>
+
+          <div class="toolbar-group export-group" aria-label="Экспорт">
+            <button id="helpButton" class="tool-button icon-only help-button" type="button" title="Помощь по управлению" aria-label="Помощь по управлению" aria-expanded="false">
+              <svg class="button-icon"><use href="#icon-help"></use></svg>
+            </button>
+            <div class="export-menu-wrap">
+              <button id="exportMenuButton" class="tool-button" type="button" title="Экспортировать разметку" aria-haspopup="true" aria-expanded="false">
+                <svg class="button-icon"><use href="#icon-share"></use></svg>
+                <span>Экспорт</span>
+              </button>
+              <div class="export-menu" id="exportMenu" role="menu" hidden>
+                <button id="exportPngButton" type="button" role="menuitem">
+                  <strong>PNG</strong>
+                  <small>только разметка</small>
+                </button>
+                <button id="exportPngBgButton" type="button" role="menuitem">
+                  <strong>PNG + план</strong>
+                  <small>с исходной подложкой</small>
+                </button>
+                <button id="exportPdfButton" type="button" role="menuitem">
+                  <strong>PDF</strong>
+                  <small>только разметка</small>
+                </button>
+                <button id="exportPdfBgButton" type="button" role="menuitem">
+                  <strong>PDF + план</strong>
+                  <small>с исходной подложкой</small>
+                </button>
+                <button id="exportSvgButton" type="button" role="menuitem">
+                  <strong>SVG</strong>
+                  <small>векторная разметка</small>
+                </button>
+                <button id="exportCsvButton" type="button" role="menuitem">
+                  <strong>CSV</strong>
+                  <small>таблица размеров</small>
+                </button>
+                <button id="exportJsonButton" type="button" role="menuitem">
+                  <strong>JSON</strong>
+                  <small>структура сессии</small>
+                </button>
+                <button id="copyShareLinkButton" type="button" role="menuitem">
+                  <strong>Ссылка</strong>
+                  <small>разметка без изображения</small>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <span class="status" id="statusText">Загрузите изображение плана</span>
+        </div>
+
+        <div class="export-status" id="exportStatus" role="status" aria-live="polite" hidden></div>
+
+        <div class="review-banner" id="analysisReview" role="status" aria-live="polite" hidden>
+          <div>
+            <strong>Проверьте найденные отрезки</strong>
+            <span id="analysisReviewText">Найденные линии показаны пунктиром. Примите их, добавьте к текущей разметке или отмените.</span>
+          </div>
+          <div class="review-actions">
+            <button id="acceptDetectedButton" class="primary-action" type="button">Принять</button>
+            <button id="addDetectedButton" type="button">Добавить</button>
+            <button id="cancelDetectedButton" type="button">Отменить</button>
+          </div>
+        </div>
+
+        <div class="calibration-hint" id="calibrationHint" role="status" aria-live="polite" hidden>
+          <div>
+            <strong id="calibrationHintTitle">Выберите базовый отрезок</strong>
+            <span id="calibrationHintText">Кликните по известному отрезку на плане или в списке. После этого введите его реальную длину.</span>
+          </div>
+          <button id="focusReferenceButton" type="button">Ввести длину</button>
+        </div>
+
+        <div class="base-confirm" id="baseConfirm" role="status" aria-live="polite" hidden>
+          <div>
+            <strong>Сделать базовым?</strong>
+            <span id="baseConfirmText">Подтвердите выбранный отрезок, чтобы случайный тап не задал масштаб.</span>
+          </div>
+          <div class="base-confirm-actions">
+            <button id="confirmBaseButton" class="primary-action" type="button">Подтвердить</button>
+            <button id="cancelBaseButton" type="button">Отмена</button>
+          </div>
+        </div>
+
+        <div class="canvas-wrap" id="canvasWrap">
+          <canvas id="planCanvas" tabindex="0" aria-label="Рабочая область плана"></canvas>
+          <div class="cursor-coordinates" id="cursorCoordinates" aria-live="off" hidden>x 0 · y 0</div>
+          <div class="empty-state" id="emptyState">
+            <section class="empty-card" aria-label="Загрузка плана">
+              <span class="empty-kicker">Новый план</span>
+              <h2>Перетащите изображение планировки сюда</h2>
+              <p>Подойдут PNG, JPG или WEBP. После загрузки линии найдутся автоматически, а при необходимости их можно дорисовать вручную.</p>
+              <button id="emptyUploadButton" class="primary-action" type="button">Выбрать изображение</button>
+            </section>
+          </div>
+        </div>
+        <div class="segment-context-menu" id="segmentContextMenu" role="menu" hidden>
+          <button type="button" data-action="base" role="menuitem">Сделать базовым</button>
+          <button type="button" data-action="rename" role="menuitem">Переименовать</button>
+          <button type="button" data-action="delete" role="menuitem">Удалить</button>
+        </div>
+
+        <div class="help-popover" id="helpPopover" role="dialog" aria-modal="false" aria-labelledby="helpTitle" hidden>
+          <div class="help-popover-card">
+            <button id="helpCloseButton" class="icon-button help-close-button" type="button" aria-label="Закрыть помощь">×</button>
+            <strong id="helpTitle">Помощь</strong>
+            <ul>
+              <li>Два пальца: масштаб плана.</li>
+              <li>Потянуть пустое место: переместить план.</li>
+              <li>Тап по отрезку: выбрать или подтвердить базовый.</li>
+              <li>Потянуть точку выбранного отрезка: изменить край.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <aside class="panel" aria-label="Отрезки">
+        <header class="panel-header">
+          <div>
+            <h1>Отрезки</h1>
+            <span id="panelSummary" class="panel-summary">0 отрезков · база не выбрана · м</span>
+          </div>
+          <button id="sidebarCloseButton" class="icon-button panel-close-button" type="button" title="Закрыть список отрезков" aria-label="Закрыть список отрезков">×</button>
+        </header>
+
+        <section class="panel-block base-section" aria-label="Базовый отрезок">
+          <div class="section-row">
+            <h2>Базовый отрезок</h2>
+            <div class="section-actions">
+              <button id="chooseBaseButton" type="button">Изменить отрезок</button>
+              <button id="focusBaseInputButton" type="button">Изменить длину</button>
+            </div>
+          </div>
+          <div class="base-card" id="baseCard">
+            <strong id="baseSegmentName">Не выбран</strong>
+            <span id="baseSegmentMeta">Выберите отрезок и введите его реальную длину.</span>
+          </div>
+        </section>
+
+        <section class="panel-block segment-section" id="segmentSection">
+          <div class="section-row">
+            <h2>Отрезки</h2>
+            <div class="section-actions">
+              <label class="sort-label">
+                <span>Сортировка</span>
+                <select id="segmentsSortSelect">
+                  <option value="created">По порядку</option>
+                  <option value="length-desc">Длинные сверху</option>
+                  <option value="name">По имени</option>
+                </select>
+              </label>
+              <button id="toggleSegmentsButton" type="button">Свернуть</button>
+              <button id="copyButton" type="button">Копировать</button>
+            </div>
+          </div>
+          <div class="segments" id="segmentsList"></div>
+          <div class="no-segments" id="noSegments">Отрезков пока нет.</div>
+        </section>
+
+        <section class="reset-section" aria-label="Сброс проекта">
+          <button id="resetPlanButton" class="reset-project-button danger" type="button" title="Удалить план, разметку и базовый размер из текущей сессии">
+            <svg class="button-icon"><use href="#icon-trash"></use></svg>
+            <span>Сбросить всё</span>
+          </button>
+        </section>
+      </aside>
+    </main>
+
+    <script src="geometry.js"></script>
+    <script src="snap.js"></script>
+    <script src="segments-panel.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
