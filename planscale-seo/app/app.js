@@ -2609,7 +2609,7 @@ function exportJson() {
   }
 
   const payload = {
-    app: "PlanScale",
+    app: "TrueScale",
     imageName: state.imageName,
     baseSegmentId: state.referenceId,
     baseValue: parseDecimal(state.referenceValue),

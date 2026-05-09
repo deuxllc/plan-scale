@@ -64,10 +64,8 @@ a {
   width: 34px;
   height: 34px;
   border-radius: 8px;
-  display: grid;
-  place-items: center;
-  background: #eef4ff;
-  color: var(--accent);
+  display: block;
+  background: #fff url("brand/truescale-logo-mark.svg") center / 26px 26px no-repeat;
   border: 1px solid rgba(37, 99, 235, 0.2);
 }
 
