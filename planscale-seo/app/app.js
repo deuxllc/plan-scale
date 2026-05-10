@@ -1,6 +1,27 @@
 const { resolvePointWithSnaps } = window.PlanScaleSnap;
 const { renderSegmentsPanel } = window.PlanScaleSegmentsPanel;
-const { analyzeImageData } = window.PlanScaleDetectionCore;
+const {
+  analyzeImageData,
+  normalizeDetectionSensitivity,
+  detectionSensitivityProgress,
+} = window.PlanScaleDetectionCore;
+const {
+  clonePoint,
+  cloneSegment,
+  encodeBase64Json,
+  decodeBase64Json,
+  normalizedRect,
+  pointInsideRect,
+  lineSegmentsIntersect,
+  parseDecimal,
+  formatDecimal,
+  rectsIntersect,
+  roundedRectPath,
+  bytesToBase64,
+  textDataUrl,
+  escapeXml,
+  segmentAngle,
+} = window.PlanScaleUtils;
 const {
   canvas,
   wrap,
@@ -96,8 +117,6 @@ const {
 
 const {
   CANVAS_COLORS,
-  DETECTION_SENSITIVITY_MIN,
-  DETECTION_SENSITIVITY_MAX,
   DEFAULT_DETECTION_SENSITIVITY,
   IMPERIAL_UNITS,
   MAX_AUTO_SEGMENTS,
@@ -236,21 +255,6 @@ function updateBackgroundOpacityControls() {
   }
 }
 
-function normalizeDetectionSensitivity(value) {
-  if (value === "clear") return DETECTION_SENSITIVITY_MIN;
-  if (value === "balanced") return 50;
-  if (value === "detailed") return 85;
-  const numeric = Number(value);
-  return Number.isFinite(numeric)
-    ? Math.min(DETECTION_SENSITIVITY_MAX, Math.max(DETECTION_SENSITIVITY_MIN, numeric))
-    : DEFAULT_DETECTION_SENSITIVITY;
-}
-
-function detectionSensitivityProgress(value = state.detectionSensitivity) {
-  const range = Math.max(1, DETECTION_SENSITIVITY_MAX - DETECTION_SENSITIVITY_MIN);
-  return (normalizeDetectionSensitivity(value) - DETECTION_SENSITIVITY_MIN) / range;
-}
-
 function sensitivityLabel(value) {
   const progress = detectionSensitivityProgress(value);
   if (progress <= 0.28) return "Меньше лишних";
@@ -274,21 +278,6 @@ function updateDetectionSensitivityControls() {
   if (runDetectionButton) runDetectionButton.hidden = !showSensitivity;
   detectModeButton?.setAttribute("aria-pressed", String(state.workflowMode === "auto"));
   manualModeButton?.setAttribute("aria-pressed", String(state.workflowMode === "manual"));
-}
-
-function clonePoint(point) {
-  return point ? { x: point.x, y: point.y } : null;
-}
-
-function cloneSegment(segment) {
-  return {
-    id: segment.id,
-    name: segment.name,
-    start: clonePoint(segment.start),
-    end: clonePoint(segment.end),
-    labelOffset: segment.labelOffset ? { ...segment.labelOffset } : null,
-    labelHidden: Boolean(segment.labelHidden),
-  };
 }
 
 function snapshotState() {
@@ -408,14 +397,6 @@ function saveSnapshotToStorage(snapshot = snapshotState()) {
   } catch {
     // Large uploaded plans can exceed localStorage. The editor still works without persistence.
   }
-}
-
-function encodeBase64Json(value) {
-  return btoa(unescape(encodeURIComponent(JSON.stringify(value))));
-}
-
-function decodeBase64Json(value) {
-  return JSON.parse(decodeURIComponent(escape(atob(value))));
 }
 
 function restoreSharedStateFromHash() {
@@ -1342,31 +1323,6 @@ function getSelectedIds() {
   return [...state.selectedSegmentIds];
 }
 
-function normalizedRect(start, end) {
-  return {
-    left: Math.min(start.x, end.x),
-    top: Math.min(start.y, end.y),
-    right: Math.max(start.x, end.x),
-    bottom: Math.max(start.y, end.y),
-  };
-}
-
-function pointInsideRect(point, rect) {
-  return point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom;
-}
-
-function orientation(a, b, c) {
-  return Math.sign((b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y));
-}
-
-function lineSegmentsIntersect(a, b, c, d) {
-  const o1 = orientation(a, b, c);
-  const o2 = orientation(a, b, d);
-  const o3 = orientation(c, d, a);
-  const o4 = orientation(c, d, b);
-  return o1 !== o2 && o3 !== o4;
-}
-
 function segmentIntersectsRect(segment, rect) {
   const start = imageToScreen(segment.start);
   const end = imageToScreen(segment.end);
@@ -1409,19 +1365,6 @@ function ratioFor(segment) {
   const referenceLength = getReferenceLength();
   if (!referenceLength) return null;
   return segmentLength(segment) / referenceLength;
-}
-
-function parseDecimal(value) {
-  if (!value.trim()) return null;
-  const normalized = value.trim().replace(/\s/g, "").replace(",", ".");
-  const parsed = Number(normalized);
-  if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  return parsed;
-}
-
-function formatDecimal(value) {
-  if (value === null || Number.isNaN(value)) return "—";
-  return value.toFixed(3).replace(".", ",");
 }
 
 function calculatedLengthFor(segment) {
@@ -1633,15 +1576,6 @@ function formatLength(value, includeUnit = true) {
   const formatted = formatDecimal(value);
   if (formatted === "—" || !includeUnit || !state.unit.trim()) return formatted;
   return `${formatted} ${state.unit.trim()}`;
-}
-
-function rectsIntersect(a, b, padding = 0) {
-  return !(
-    a.right + padding < b.left ||
-    a.left - padding > b.right ||
-    a.bottom + padding < b.top ||
-    a.top - padding > b.bottom
-  );
 }
 
 function isSegmentFootnoteVisible(segment) {
@@ -1859,7 +1793,7 @@ function drawSegment(segment) {
   ctx.fillStyle = `rgba(255, 255, 255, ${labelOpacity})`;
   ctx.strokeStyle = isSelected ? CANVAS_COLORS.selected : isReference ? CANVAS_COLORS.reference : "rgba(79, 97, 120, 0.34)";
   ctx.lineWidth = 0.8;
-  roundedRect(labelRect.left, labelRect.top, labelWidth, labelHeight, labelHeight / 2);
+  roundedRectPath(ctx, labelRect.left, labelRect.top, labelWidth, labelHeight, labelHeight / 2);
   ctx.fill();
   ctx.stroke();
 
@@ -2056,7 +1990,7 @@ function drawHintPill(text, x, y) {
   ctx.font = "700 13px 'DM Sans', Inter, system-ui, sans-serif";
   const width = ctx.measureText(text).width + 22;
   const height = 30;
-  roundedRect(x - width / 2, y - height / 2, width, height, height / 2);
+  roundedRectPath(ctx, x - width / 2, y - height / 2, width, height, height / 2);
   ctx.fillStyle = "rgba(32, 41, 54, 0.88)";
   ctx.fill();
   ctx.fillStyle = "#ffffff";
@@ -2097,17 +2031,6 @@ function drawCanvasHints() {
   if (state.smartGridEnabled && state.pendingPoint) {
     drawHintPill("90° включено", rect.width - 92, 34);
   }
-}
-
-function roundedRect(x, y, width, height, radius) {
-  const r = Math.min(radius, width / 2, height / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + width, y, x + width, y + height, r);
-  ctx.arcTo(x + width, y + height, x, y + height, r);
-  ctx.arcTo(x, y + height, x, y, r);
-  ctx.arcTo(x, y, x + width, y, r);
-  ctx.closePath();
 }
 
 function draw() {
@@ -2350,7 +2273,7 @@ function renderExportCanvas({ withBackground, whiteBackground = false }) {
 
     exportContext.beginPath();
     const radius = 5 / viewScale;
-    roundedRectOnContext(exportContext, labelRect.left, labelRect.top, labelWidth, labelHeight, radius);
+    roundedRectPath(exportContext, labelRect.left, labelRect.top, labelWidth, labelHeight, radius);
     exportContext.fillStyle = "rgba(255, 255, 255, 0.88)";
     exportContext.strokeStyle = segmentColor;
     exportContext.lineWidth = Math.max(0.8, 1 / viewScale);
@@ -2364,26 +2287,6 @@ function renderExportCanvas({ withBackground, whiteBackground = false }) {
   }
 
   return exportCanvas;
-}
-
-function roundedRectOnContext(targetContext, x, y, width, height, radius) {
-  const r = Math.min(radius, width / 2, height / 2);
-  targetContext.moveTo(x + r, y);
-  targetContext.arcTo(x + width, y, x + width, y + height, r);
-  targetContext.arcTo(x + width, y + height, x, y + height, r);
-  targetContext.arcTo(x, y + height, x, y, r);
-  targetContext.arcTo(x, y, x + width, y, r);
-  targetContext.closePath();
-}
-
-function bytesToBase64(bytes) {
-  let binary = "";
-  const chunkSize = 8192;
-  for (let index = 0; index < bytes.length; index += chunkSize) {
-    const chunk = bytes.subarray(index, index + chunkSize);
-    binary += String.fromCharCode(...chunk);
-  }
-  return btoa(binary);
 }
 
 function showExportLink(dataUrl, filename) {
@@ -2585,10 +2488,6 @@ async function exportPdf(withBackground) {
   showExportLink(pdfDataUrl, safeExportName("pdf", withBackground));
 }
 
-function textDataUrl(mime, text) {
-  return `data:${mime};charset=utf-8,${encodeURIComponent(text)}`;
-}
-
 function dataExportName(extension) {
   return safeExportName(extension, false);
 }
@@ -2682,14 +2581,6 @@ async function copyShareLink() {
   }
 }
 
-function escapeXml(value) {
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
 function colorForSegment(segment) {
   if (segment.id === state.referenceId) return CANVAS_COLORS.reference;
   if (state.rightAngleIds.has(segment.id) || isGridAlignedSegment(segment)) return CANVAS_COLORS.angle;
@@ -2754,12 +2645,6 @@ function exportSvg() {
     return;
   }
   showExportLink(textDataUrl("image/svg+xml", createSvgMarkup()), dataExportName("svg"));
-}
-
-function segmentAngle(segment) {
-  const radians = Math.atan2(segment.end.y - segment.start.y, segment.end.x - segment.start.x);
-  const degrees = radians * 180 / Math.PI;
-  return Math.round(degrees * 10) / 10;
 }
 
 function sortedSegmentsForPanel() {
