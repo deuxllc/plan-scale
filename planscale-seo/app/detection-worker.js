@@ -6,14 +6,22 @@ self.addEventListener("message", (event) => {
   self.postMessage({ type: "result", segments });
 });
 
-function detectionProfile(name) {
-  if (name === "clear") {
-    return { minRunRatio: 0.055, axisToleranceRatio: 0.005, maxThicknessRatio: 0.025 };
-  }
-  if (name === "detailed") {
-    return { minRunRatio: 0.022, axisToleranceRatio: 0.008, maxThicknessRatio: 0.05 };
-  }
-  return { minRunRatio: 0.035, axisToleranceRatio: 0.006, maxThicknessRatio: 0.035 };
+function normalizeDetectionSensitivity(value) {
+  if (value === "clear") return 15;
+  if (value === "balanced") return 50;
+  if (value === "detailed") return 85;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.min(100, Math.max(0, numeric)) : 50;
+}
+
+function detectionProfile(value) {
+  const t = normalizeDetectionSensitivity(value) / 100;
+  const strictness = (1 - t) ** 2;
+  return {
+    minRunRatio: 0.02 + strictness * 0.28,
+    axisToleranceRatio: 0.001 + t * 0.01,
+    maxThicknessRatio: 0.004 + t * 0.06,
+  };
 }
 
 function analyze(data, width, height, processScale, sensitivity) {

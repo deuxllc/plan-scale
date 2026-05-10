@@ -81,6 +81,7 @@ const nextActionPanel = document.querySelector("#nextActionPanel");
 const manualModeButton = document.querySelector("#manualModeButton");
 const detectModeButton = document.querySelector("#detectModeButton");
 const detectionSensitivityInput = document.querySelector("#detectionSensitivityInput");
+const detectionSensitivityValue = document.querySelector("#detectionSensitivityValue");
 const scaleRuler = document.querySelector("#scaleRuler");
 const scaleRulerValue = document.querySelector("#scaleRulerValue");
 const scaleRulerLine = document.querySelector("#scaleRulerLine");
@@ -129,7 +130,8 @@ const state = {
   detectedSegments: [],
   smartGridEnabled: true,
   nextActionPromptVisible: false,
-  detectionSensitivity: detectionSensitivityInput?.value || "balanced",
+  workflowMode: null,
+  detectionSensitivity: Number(detectionSensitivityInput?.value) || 50,
   isDrawingSegments: false,
   isChoosingBase: false,
   sidebarCollapsed: true,
@@ -207,6 +209,33 @@ function updateBackgroundOpacityControls() {
   }
 }
 
+function normalizeDetectionSensitivity(value) {
+  if (value === "clear") return 15;
+  if (value === "balanced") return 50;
+  if (value === "detailed") return 85;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.min(100, Math.max(0, numeric)) : 50;
+}
+
+function sensitivityLabel(value) {
+  const numeric = normalizeDetectionSensitivity(value);
+  if (numeric <= 30) return "Меньше лишних";
+  if (numeric >= 70) return "Больше деталей";
+  return "Сбалансировано";
+}
+
+function updateDetectionSensitivityControls() {
+  const value = normalizeDetectionSensitivity(state.detectionSensitivity);
+  state.detectionSensitivity = value;
+  if (detectionSensitivityInput) {
+    detectionSensitivityInput.value = String(value);
+    detectionSensitivityInput.style.setProperty("--sensitivity-progress", `${value}%`);
+  }
+  if (detectionSensitivityValue) {
+    detectionSensitivityValue.textContent = sensitivityLabel(value);
+  }
+}
+
 function clonePoint(point) {
   return point ? { x: point.x, y: point.y } : null;
 }
@@ -241,6 +270,7 @@ function snapshotState() {
     footnotesVisible: state.footnotesVisible,
     smartGridEnabled: state.smartGridEnabled,
     detectionSensitivity: state.detectionSensitivity,
+    workflowMode: state.workflowMode,
     isDrawingSegments: state.isDrawingSegments,
     isChoosingBase: state.isChoosingBase,
     nextSegmentId,
@@ -304,7 +334,8 @@ async function applySnapshot(snapshot) {
     state.rightAngleIds = new Set();
     state.detectedSegments = [];
     state.smartGridEnabled = true;
-    state.detectionSensitivity = snapshot.detectionSensitivity || "balanced";
+    state.detectionSensitivity = normalizeDetectionSensitivity(snapshot.detectionSensitivity);
+    state.workflowMode = snapshot.workflowMode || null;
     state.nextActionPromptVisible = false;
     state.isDrawingSegments = Boolean(snapshot.isDrawingSegments);
     state.isChoosingBase = Boolean(snapshot.isChoosingBase);
@@ -318,7 +349,7 @@ async function applySnapshot(snapshot) {
     setUnitInputValue(state.unit);
     if (inlineReferenceLengthInput) inlineReferenceLengthInput.value = state.referenceValue;
     if (inlineUnitInput) inlineUnitInput.value = state.unit;
-    if (detectionSensitivityInput) detectionSensitivityInput.value = state.detectionSensitivity;
+    updateDetectionSensitivityControls();
     smartGridToggle.checked = state.smartGridEnabled;
     updateToolControls();
     emptyState.hidden = Boolean(state.image);
@@ -416,7 +447,7 @@ function updateHistoryButtons() {
   redoButton.disabled = historyState.redo.length === 0;
   removeUnderlayButton.disabled = !hasImage;
   resetPlanButton.disabled = !hasImage && !hasSegments && !hasDetected;
-  fitButton.disabled = !hasImage;
+  if (fitButton) fitButton.disabled = !hasImage;
   drawSegmentButton.disabled = !hasImage;
   reanalyzeButton.disabled = !hasImage || state.isAnalyzing;
   exportMenuButton.disabled = !hasImage;
@@ -453,6 +484,7 @@ function updateToolControls() {
   }
 
   updateBackgroundOpacityControls();
+  updateDetectionSensitivityControls();
   const underlayLabel = removeUnderlayButton.querySelector("span");
   if (underlayLabel) {
     underlayLabel.textContent = !state.image
@@ -510,14 +542,19 @@ function updateGuidanceControls() {
     addDetectedButton.hidden = !hasCurrentMarkup;
   }
 
-  const needsBase = Boolean(state.image && !state.referenceId);
+  const needsBase = Boolean(state.image && !state.referenceId && !state.nextActionPromptVisible && (state.isDrawingSegments || state.segments.length));
   const needsLength = Boolean(state.image && state.segments.length && state.referenceId && parseDecimal(state.referenceValue) === null);
   calibrationHint.hidden = !needsBase && !needsLength;
   if (needsBase) {
-    calibrationHintTitle.textContent = "Задайте масштаб";
-    calibrationHintText.textContent = state.pendingPoint
-      ? "Поставьте вторую точку на известном размере."
-      : "Проведите отрезок по известному размеру на изображении.";
+    if (state.segments.length && !state.pendingPoint) {
+      calibrationHintTitle.textContent = "Выберите базовый отрезок";
+      calibrationHintText.textContent = "Кликните по линии с известным размером, затем введите ее длину.";
+    } else {
+      calibrationHintTitle.textContent = "Задайте масштаб";
+      calibrationHintText.textContent = state.pendingPoint
+        ? "Поставьте вторую точку на известном размере."
+        : "Проведите отрезок по известному размеру на изображении.";
+    }
   } else if (needsLength) {
     calibrationHintTitle.textContent = "Введите базовый размер";
     calibrationHintText.textContent = "Введите реальную длину рядом с базовым отрезком и нажмите OK.";
@@ -562,7 +599,6 @@ function syncNextActionPanel() {
   if (!nextActionPanel) return;
   const shouldShow = Boolean(
     state.image
-    && hasCompleteBaseLength()
     && state.nextActionPromptVisible
     && !state.detectedSegments.length
     && !state.isAnalyzing,
@@ -1611,14 +1647,14 @@ function materializeDetectedSegments(append = false) {
   }
 }
 
-function detectionProfile(name = state.detectionSensitivity) {
-  if (name === "clear") {
-    return { minRunRatio: 0.055, axisToleranceRatio: 0.005, maxThicknessRatio: 0.025 };
-  }
-  if (name === "detailed") {
-    return { minRunRatio: 0.022, axisToleranceRatio: 0.008, maxThicknessRatio: 0.05 };
-  }
-  return { minRunRatio: 0.035, axisToleranceRatio: 0.006, maxThicknessRatio: 0.035 };
+function detectionProfile(value = state.detectionSensitivity) {
+  const t = normalizeDetectionSensitivity(value) / 100;
+  const strictness = (1 - t) ** 2;
+  return {
+    minRunRatio: 0.02 + strictness * 0.28,
+    axisToleranceRatio: 0.001 + t * 0.01,
+    maxThicknessRatio: 0.004 + t * 0.06,
+  };
 }
 
 function detectImageSegmentsFromImage(sensitivity = state.detectionSensitivity) {
@@ -1708,8 +1744,8 @@ function analyzeImageSegments({ automatic = false, sensitivity = state.detection
     return;
   }
 
-  state.detectionSensitivity = sensitivity;
-  if (detectionSensitivityInput) detectionSensitivityInput.value = sensitivity;
+  state.detectionSensitivity = normalizeDetectionSensitivity(sensitivity);
+  updateDetectionSensitivityControls();
   const runId = ++analysisRunId;
   state.isAnalyzing = true;
   state.detectedSegments = [];
@@ -2224,6 +2260,10 @@ function drawCanvasHints() {
     return;
   }
 
+  if (state.nextActionPromptVisible) {
+    return;
+  }
+
   const rect = canvas.getBoundingClientRect();
   if (!state.segments.length && !state.detectedSegments.length && !state.isAnalyzing) {
     drawHintPill(isCoarsePointer() ? "Поставьте первую точку" : "Нажмите «Отрезок» и поставьте первую точку", rect.width / 2, rect.height / 2);
@@ -2261,6 +2301,10 @@ function roundedRect(x, y, width, height, radius) {
 function draw() {
   const rect = canvas.getBoundingClientRect();
   ctx.clearRect(0, 0, rect.width, rect.height);
+  ctx.save();
+  ctx.fillStyle = "#f8fafc";
+  ctx.fillRect(0, 0, rect.width, rect.height);
+  ctx.restore();
 
   if (!state.image) {
     syncCanvasOverlays();
@@ -3015,12 +3059,13 @@ function updateStatus() {
   const detectedState = state.detectedSegments.length ? ` · предпросмотр ${state.detectedSegments.length}` : "";
   const underlayState = state.backgroundVisible ? "" : " · подложка скрыта";
   const drawingState = state.isDrawingSegments ? " · добавление отрезков" : "";
-  const baseState = !state.referenceId
+  const choosingState = state.nextActionPromptVisible ? " · выберите режим" : "";
+  const baseState = !state.referenceId && !state.nextActionPromptVisible
     ? " · задайте масштаб"
-    : parseDecimal(state.referenceValue) === null
+    : state.referenceId && parseDecimal(state.referenceValue) === null
       ? " · введите базовый размер"
       : "";
-  statusText.textContent = `Изображение готово${detectedState}${baseState}${underlayState}${drawingState}`;
+  statusText.textContent = `Изображение готово${detectedState}${choosingState}${baseState}${underlayState}${drawingState}`;
 }
 
 function plural(value, one, few, many) {
@@ -3160,6 +3205,7 @@ function resetPlan() {
   state.isDrawingSegments = false;
   state.isChoosingBase = false;
   state.nextActionPromptVisible = false;
+  state.workflowMode = null;
   state.isAnalyzing = false;
   state.hoveredSegmentId = null;
   nextSegmentId = 1;
@@ -3228,8 +3274,9 @@ function loadImageFile(file) {
       state.pendingReferenceId = null;
       state.previewPoint = null;
       state.orthogonalGuide = null;
-      state.isDrawingSegments = !preserveExistingMarkup;
-      state.nextActionPromptVisible = false;
+      state.workflowMode = null;
+      state.isDrawingSegments = false;
+      state.nextActionPromptVisible = !preserveExistingMarkup;
       state.isAnalyzing = false;
       state.hoveredSegmentId = null;
       emptyState.hidden = true;
@@ -3302,12 +3349,16 @@ cancelBaseButton?.addEventListener("click", () => {
   updateAll();
 });
 
-fitButton.addEventListener("click", () => {
+fitButton?.addEventListener("click", () => {
   fitImage();
   scheduleViewSave();
 });
 drawSegmentButton.addEventListener("click", () => {
   state.isDrawingSegments = !state.isDrawingSegments;
+  if (state.isDrawingSegments) {
+    state.nextActionPromptVisible = false;
+    state.workflowMode = "manual";
+  }
   state.detectedSegments = [];
   if (!state.isDrawingSegments) {
     state.pendingPoint = null;
@@ -3321,6 +3372,7 @@ drawSegmentButton.addEventListener("click", () => {
 reanalyzeButton.addEventListener("click", () => {
   if (!state.image || state.isAnalyzing) return;
   state.nextActionPromptVisible = false;
+  state.workflowMode = "auto";
   analyzeImageSegments({ automatic: false, sensitivity: state.detectionSensitivity });
 });
 
@@ -3502,14 +3554,15 @@ inlineCalibration?.addEventListener("submit", (event) => {
   referenceLengthInput.value = value;
   state.unit = inlineUnitInput?.value || state.unit;
   setUnitInputValue(state.unit);
-  state.nextActionPromptVisible = true;
-  state.isDrawingSegments = false;
+  state.nextActionPromptVisible = false;
+  state.isDrawingSegments = state.workflowMode === "manual";
   updateAll();
   commitHistory();
 });
 
 manualModeButton?.addEventListener("click", () => {
   state.nextActionPromptVisible = false;
+  state.workflowMode = "manual";
   state.isDrawingSegments = true;
   state.detectedSegments = [];
   updateAll();
@@ -3518,13 +3571,20 @@ manualModeButton?.addEventListener("click", () => {
 
 detectModeButton?.addEventListener("click", () => {
   state.nextActionPromptVisible = false;
-  state.detectionSensitivity = detectionSensitivityInput?.value || state.detectionSensitivity;
+  state.workflowMode = "auto";
+  state.detectionSensitivity = normalizeDetectionSensitivity(detectionSensitivityInput?.value);
   updateAll();
   analyzeImageSegments({ automatic: false, sensitivity: state.detectionSensitivity });
 });
 
+detectionSensitivityInput?.addEventListener("input", () => {
+  state.detectionSensitivity = normalizeDetectionSensitivity(detectionSensitivityInput.value);
+  updateDetectionSensitivityControls();
+});
+
 detectionSensitivityInput?.addEventListener("change", () => {
-  state.detectionSensitivity = detectionSensitivityInput.value;
+  state.detectionSensitivity = normalizeDetectionSensitivity(detectionSensitivityInput.value);
+  updateDetectionSensitivityControls();
   saveSnapshotToStorage();
 });
 

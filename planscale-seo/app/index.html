@@ -170,9 +170,6 @@
           </div>
 
           <div class="toolbar-group compact segment-tools-group" aria-label="Инструменты отрезков">
-            <button id="fitButton" class="tool-button icon-only" type="button" title="Показать всё изображение" aria-label="Показать всё изображение">
-              <svg class="button-icon"><use href="#icon-fit"></use></svg>
-            </button>
             <button id="reanalyzeButton" class="tool-button icon-only reanalyze-button" type="button" title="Заново найти отрезки на плане" aria-label="Заново найти отрезки на плане">
               <svg class="button-icon"><use href="#icon-reanalyze"></use></svg>
             </button>
@@ -324,25 +321,27 @@
             </div>
           </form>
           <section class="next-action-panel" id="nextActionPanel" aria-label="Следующий шаг" hidden>
-            <span>Масштаб задан</span>
-            <strong>Что сделать дальше?</strong>
+            <span>Изображение загружено</span>
+            <strong>Что хотите сделать?</strong>
             <div class="next-action-grid">
               <button id="manualModeButton" type="button">
                 <strong>Рисовать вручную</strong>
-                <small>Для фото, карт и нестандартных объектов</small>
+                <small>Сначала проведите известный размер, затем добавляйте измерения.</small>
               </button>
               <button id="detectModeButton" type="button">
                 <strong>Найти линии на плане</strong>
-                <small>Для планов, чертежей и схем</small>
+                <small>Сначала распознаем линии, потом выберите базовый отрезок.</small>
               </button>
             </div>
-            <label class="detection-sensitivity">
+            <label class="detection-sensitivity" for="detectionSensitivityInput">
               <span>Чувствительность поиска</span>
-              <select id="detectionSensitivityInput">
-                <option value="clear">Меньше лишних</option>
-                <option value="balanced" selected>Сбалансировано</option>
-                <option value="detailed">Больше деталей</option>
-              </select>
+              <strong id="detectionSensitivityValue">Сбалансировано</strong>
+              <input id="detectionSensitivityInput" type="range" min="0" max="100" step="1" value="50" />
+              <div class="sensitivity-scale" aria-hidden="true">
+                <span>Меньше лишних</span>
+                <span>Сбалансировано</span>
+                <span>Больше деталей</span>
+              </div>
             </label>
           </section>
           <div class="cursor-coordinates" id="cursorCoordinates" aria-live="off" hidden>x 0 · y 0</div>
