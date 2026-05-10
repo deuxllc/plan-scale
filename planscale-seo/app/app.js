@@ -1,110 +1,114 @@
 const { resolvePointWithSnaps } = window.PlanScaleSnap;
 const { renderSegmentsPanel } = window.PlanScaleSegmentsPanel;
-const canvas = document.querySelector("#planCanvas");
-const wrap = document.querySelector("#canvasWrap");
-const appShell = document.querySelector(".app-shell");
-const ctx = canvas.getContext("2d");
+const { analyzeImageData } = window.PlanScaleDetectionCore;
+const {
+  canvas,
+  wrap,
+  appShell,
+  ctx,
+  imageInput,
+  removeUnderlayButton,
+  resetPlanButton,
+  fitButton,
+  drawSegmentButton,
+  reanalyzeButton,
+  sidebarToggleButton,
+  sidebarCloseButton,
+  topbar,
+  measureGroup,
+  historyGroup,
+  baseSection,
+  undoButton,
+  redoButton,
+  clearButton,
+  toggleAllFootnotesButton,
+  copyButton,
+  toggleSegmentsButton,
+  statusText,
+  exportStatus,
+  emptyState,
+  segmentSection,
+  segmentsList,
+  noSegments,
+  resultOutput,
+  panelSummary,
+  smartGridToggle,
+  referenceLengthInput,
+  unitInput,
+  exportMenuButton,
+  exportMenu,
+  exportPngButton,
+  exportPngBgButton,
+  exportPdfButton,
+  exportPdfBgButton,
+  exportSvgButton,
+  exportCsvButton,
+  exportJsonButton,
+  copyShareLinkButton,
+  helpButton,
+  helpPopover,
+  helpCloseButton,
+  welcomeOverlay,
+  welcomeStartButton,
+  emptyUploadButton,
+  cursorCoordinates,
+  analysisReview,
+  analysisReviewText,
+  acceptDetectedButton,
+  addDetectedButton,
+  cancelDetectedButton,
+  calibrationHint,
+  calibrationHintTitle,
+  calibrationHintText,
+  focusReferenceButton,
+  baseConfirm,
+  baseConfirmText,
+  confirmBaseButton,
+  cancelBaseButton,
+  referenceField,
+  segmentContextMenu,
+  focusBaseInputButton,
+  chooseBaseButton,
+  baseSegmentName,
+  baseSegmentMeta,
+  segmentsSortSelect,
+  backgroundOpacityInput,
+  backgroundOpacityValue,
+  toggleBackgroundOpacityButton,
+  inlineCalibration,
+  inlineReferenceLengthInput,
+  inlineUnitInput,
+  nextActionPanel,
+  manualModeButton,
+  detectModeButton,
+  runDetectionButton,
+  detectionSensitivityInput,
+  detectionSensitivityControl,
+  detectionSensitivityValue,
+  metricUnitsButton,
+  imperialUnitsButton,
+  scaleRuler,
+  scaleRulerValue,
+  scaleRulerLine,
+  scaleRulerZoom,
+  scaleRulerResetButton,
+} = window.PlanScaleDom;
 
-const imageInput = document.querySelector("#imageInput");
-const removeUnderlayButton = document.querySelector("#removeUnderlayButton");
-const resetPlanButton = document.querySelector("#resetPlanButton");
-const fitButton = document.querySelector("#fitButton");
-const drawSegmentButton = document.querySelector("#drawSegmentButton");
-const reanalyzeButton = document.querySelector("#reanalyzeButton");
-const sidebarToggleButton = document.querySelector("#sidebarToggleButton");
-const sidebarCloseButton = document.querySelector("#sidebarCloseButton");
-const topbar = document.querySelector(".topbar");
-const measureGroup = document.querySelector(".measure-group");
-const historyGroup = document.querySelector(".history-group");
-const baseSection = document.querySelector(".base-section");
-const undoButton = document.querySelector("#undoButton");
-const redoButton = document.querySelector("#redoButton");
-const clearButton = document.querySelector("#clearButton");
-const toggleAllFootnotesButton = document.querySelector("#toggleAllFootnotesButton");
-const copyButton = document.querySelector("#copyButton");
-const toggleSegmentsButton = document.querySelector("#toggleSegmentsButton");
-const statusText = document.querySelector("#statusText");
-const exportStatus = document.querySelector("#exportStatus");
-const emptyState = document.querySelector("#emptyState");
-const segmentSection = document.querySelector("#segmentSection");
-const segmentsList = document.querySelector("#segmentsList");
-const noSegments = document.querySelector("#noSegments");
-const resultOutput = document.querySelector("#resultOutput");
-const panelSummary = document.querySelector("#panelSummary");
-const smartGridToggle = document.querySelector("#smartGridToggle");
-const referenceLengthInput = document.querySelector("#referenceLengthInput");
-const unitInput = document.querySelector("#unitInput");
-const exportMenuButton = document.querySelector("#exportMenuButton");
-const exportMenu = document.querySelector("#exportMenu");
-const exportPngButton = document.querySelector("#exportPngButton");
-const exportPngBgButton = document.querySelector("#exportPngBgButton");
-const exportPdfButton = document.querySelector("#exportPdfButton");
-const exportPdfBgButton = document.querySelector("#exportPdfBgButton");
-const exportSvgButton = document.querySelector("#exportSvgButton");
-const exportCsvButton = document.querySelector("#exportCsvButton");
-const exportJsonButton = document.querySelector("#exportJsonButton");
-const copyShareLinkButton = document.querySelector("#copyShareLinkButton");
-const helpButton = document.querySelector("#helpButton");
-const helpPopover = document.querySelector("#helpPopover");
-const helpCloseButton = document.querySelector("#helpCloseButton");
-const welcomeOverlay = document.querySelector("#welcomeOverlay");
-const welcomeStartButton = document.querySelector("#welcomeStartButton");
-const emptyUploadButton = document.querySelector("#emptyUploadButton");
-const cursorCoordinates = document.querySelector("#cursorCoordinates");
-const analysisReview = document.querySelector("#analysisReview");
-const analysisReviewText = document.querySelector("#analysisReviewText");
-const acceptDetectedButton = document.querySelector("#acceptDetectedButton");
-const addDetectedButton = document.querySelector("#addDetectedButton");
-const cancelDetectedButton = document.querySelector("#cancelDetectedButton");
-const calibrationHint = document.querySelector("#calibrationHint");
-const calibrationHintTitle = document.querySelector("#calibrationHintTitle");
-const calibrationHintText = document.querySelector("#calibrationHintText");
-const focusReferenceButton = document.querySelector("#focusReferenceButton");
-const baseConfirm = document.querySelector("#baseConfirm");
-const baseConfirmText = document.querySelector("#baseConfirmText");
-const confirmBaseButton = document.querySelector("#confirmBaseButton");
-const cancelBaseButton = document.querySelector("#cancelBaseButton");
-const referenceField = referenceLengthInput.closest(".toolbar-field");
-const segmentContextMenu = document.querySelector("#segmentContextMenu");
-const focusBaseInputButton = document.querySelector("#focusBaseInputButton");
-const chooseBaseButton = document.querySelector("#chooseBaseButton");
-const baseSegmentName = document.querySelector("#baseSegmentName");
-const baseSegmentMeta = document.querySelector("#baseSegmentMeta");
-const segmentsSortSelect = document.querySelector("#segmentsSortSelect");
-const backgroundOpacityInput = document.querySelector("#backgroundOpacityInput");
-const backgroundOpacityValue = document.querySelector("#backgroundOpacityValue");
-const toggleBackgroundOpacityButton = document.querySelector("#toggleBackgroundOpacityButton");
-const inlineCalibration = document.querySelector("#inlineCalibration");
-const inlineReferenceLengthInput = document.querySelector("#inlineReferenceLengthInput");
-const inlineUnitInput = document.querySelector("#inlineUnitInput");
-const nextActionPanel = document.querySelector("#nextActionPanel");
-const manualModeButton = document.querySelector("#manualModeButton");
-const detectModeButton = document.querySelector("#detectModeButton");
-const runDetectionButton = document.querySelector("#runDetectionButton");
-const detectionSensitivityInput = document.querySelector("#detectionSensitivityInput");
-const detectionSensitivityControl = document.querySelector("#detectionSensitivityControl");
-const detectionSensitivityValue = document.querySelector("#detectionSensitivityValue");
-const metricUnitsButton = document.querySelector("#metricUnitsButton");
-const imperialUnitsButton = document.querySelector("#imperialUnitsButton");
-const scaleRuler = document.querySelector("#scaleRuler");
-const scaleRulerValue = document.querySelector("#scaleRulerValue");
-const scaleRulerLine = document.querySelector("#scaleRulerLine");
-const scaleRulerZoom = document.querySelector("#scaleRulerZoom");
-const scaleRulerResetButton = document.querySelector("#scaleRulerResetButton");
-
-const CANVAS_COLORS = {
-  selected: "#2563eb",
-  reference: "#0f8f73",
-  normal: "#4f6f8f",
-  angle: "#7768c8",
-  detected: "#6475d9",
-  leader: "rgba(79, 97, 120, 0.44)",
-};
-
-const DETECTION_SENSITIVITY_MIN = 15;
-const DETECTION_SENSITIVITY_MAX = 100;
-const DEFAULT_DETECTION_SENSITIVITY = DETECTION_SENSITIVITY_MIN;
-const IMPERIAL_UNITS = new Set(["ft", "in"]);
+const {
+  CANVAS_COLORS,
+  DETECTION_SENSITIVITY_MIN,
+  DETECTION_SENSITIVITY_MAX,
+  DEFAULT_DETECTION_SENSITIVITY,
+  IMPERIAL_UNITS,
+  MAX_AUTO_SEGMENTS,
+  STORAGE_KEY,
+  VIEW_SAVE_DELAY,
+  MIN_VIEW_SCALE,
+  MAX_VIEW_SCALE,
+  TOUCH_LONG_PRESS_MS,
+  TOUCH_ENDPOINT_HIT_RADIUS,
+  TOUCH_ENDPOINT_DRAG_OFFSET,
+} = window.PlanScaleConfig;
 
 const state = {
   image: null,
@@ -156,14 +160,6 @@ let nextSegmentId = 1;
 let analysisRunId = 0;
 let activeContextSegmentId = null;
 let resizeTimer = 0;
-const MAX_AUTO_SEGMENTS = 150;
-const STORAGE_KEY = "planscale-state-v4";
-const VIEW_SAVE_DELAY = 220;
-const MIN_VIEW_SCALE = 0.05;
-const MAX_VIEW_SCALE = 12;
-const TOUCH_LONG_PRESS_MS = 560;
-const TOUCH_ENDPOINT_HIT_RADIUS = 44;
-const TOUCH_ENDPOINT_DRAG_OFFSET = 42;
 const historyState = {
   undo: [],
   redo: [],
@@ -1435,204 +1431,6 @@ function calculatedLengthFor(segment) {
   return ratio * referenceValue;
 }
 
-function median(values) {
-  if (!values.length) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2
-    ? sorted[middle]
-    : (sorted[middle - 1] + sorted[middle]) / 2;
-}
-
-function otsuThreshold(grayscale) {
-  const histogram = new Array(256).fill(0);
-  for (const value of grayscale) {
-    histogram[value]++;
-  }
-
-  const total = grayscale.length;
-  let sum = 0;
-  for (let i = 0; i < 256; i++) {
-    sum += i * histogram[i];
-  }
-
-  let sumBackground = 0;
-  let weightBackground = 0;
-  let maxVariance = 0;
-  let threshold = 128;
-
-  for (let i = 0; i < 256; i++) {
-    weightBackground += histogram[i];
-    if (!weightBackground) continue;
-
-    const weightForeground = total - weightBackground;
-    if (!weightForeground) break;
-
-    sumBackground += i * histogram[i];
-    const meanBackground = sumBackground / weightBackground;
-    const meanForeground = (sum - sumBackground) / weightForeground;
-    const variance = weightBackground * weightForeground * (meanBackground - meanForeground) ** 2;
-
-    if (variance > maxVariance) {
-      maxVariance = variance;
-      threshold = i;
-    }
-  }
-
-  return Math.min(200, Math.max(70, threshold));
-}
-
-function collectRuns(binary, width, height, horizontal, minRun) {
-  const runs = [];
-  const primarySize = horizontal ? height : width;
-  const secondarySize = horizontal ? width : height;
-
-  for (let primary = 0; primary < primarySize; primary++) {
-    let secondary = 0;
-    while (secondary < secondarySize) {
-      while (secondary < secondarySize) {
-        const index = horizontal ? primary * width + secondary : secondary * width + primary;
-        if (binary[index]) break;
-        secondary++;
-      }
-
-      const start = secondary;
-      while (secondary < secondarySize) {
-        const index = horizontal ? primary * width + secondary : secondary * width + primary;
-        if (!binary[index]) break;
-        secondary++;
-      }
-
-      const end = secondary - 1;
-      if (end - start + 1 >= minRun) {
-        runs.push({ start, end, axis: primary });
-      }
-    }
-  }
-
-  return runs;
-}
-
-function rangesOverlap(aStart, aEnd, bStart, bEnd) {
-  return Math.max(0, Math.min(aEnd, bEnd) - Math.max(aStart, bStart) + 1);
-}
-
-function mergeRuns(runs, axisTolerance) {
-  const groups = [];
-
-  for (const run of runs) {
-    let bestGroup = null;
-    let bestOverlap = 0;
-    const runLength = run.end - run.start + 1;
-
-    for (const group of groups) {
-      if (run.axis > group.maxAxis + axisTolerance) continue;
-      if (run.axis < group.minAxis - axisTolerance) continue;
-
-      const groupStart = median(group.starts);
-      const groupEnd = median(group.ends);
-      const groupLength = groupEnd - groupStart + 1;
-      const overlap = rangesOverlap(run.start, run.end, groupStart, groupEnd);
-      const overlapRatio = overlap / Math.min(runLength, groupLength);
-
-      if (overlapRatio > 0.45 && overlap > bestOverlap) {
-        bestGroup = group;
-        bestOverlap = overlap;
-      }
-    }
-
-    if (!bestGroup) {
-      groups.push({
-        minAxis: run.axis,
-        maxAxis: run.axis,
-        starts: [run.start],
-        ends: [run.end],
-      });
-      continue;
-    }
-
-    bestGroup.minAxis = Math.min(bestGroup.minAxis, run.axis);
-    bestGroup.maxAxis = Math.max(bestGroup.maxAxis, run.axis);
-    bestGroup.starts.push(run.start);
-    bestGroup.ends.push(run.end);
-  }
-
-  return groups;
-}
-
-function groupsToSegments(groups, horizontal, minRun, maxThickness, processScale) {
-  const segments = [];
-
-  for (const group of groups) {
-    const start = median(group.starts);
-    const end = median(group.ends);
-    const axis = (group.minAxis + group.maxAxis) / 2;
-    const length = end - start + 1;
-    const thickness = group.maxAxis - group.minAxis + 1;
-
-    if (length < minRun || thickness > maxThickness || length / Math.max(1, thickness) < 4) {
-      continue;
-    }
-
-    if (horizontal) {
-      segments.push({
-        start: { x: start / processScale, y: axis / processScale },
-        end: { x: end / processScale, y: axis / processScale },
-      });
-    } else {
-      segments.push({
-        start: { x: axis / processScale, y: start / processScale },
-        end: { x: axis / processScale, y: end / processScale },
-      });
-    }
-  }
-
-  return segments;
-}
-
-function areSimilarSegments(a, b) {
-  const aHorizontal = Math.abs(a.start.y - a.end.y) <= Math.abs(a.start.x - a.end.x);
-  const bHorizontal = Math.abs(b.start.y - b.end.y) <= Math.abs(b.start.x - b.end.x);
-  if (aHorizontal !== bHorizontal) return false;
-
-  if (aHorizontal) {
-    const yA = (a.start.y + a.end.y) / 2;
-    const yB = (b.start.y + b.end.y) / 2;
-    if (Math.abs(yA - yB) > 5) return false;
-    const overlap = rangesOverlap(
-      Math.min(a.start.x, a.end.x),
-      Math.max(a.start.x, a.end.x),
-      Math.min(b.start.x, b.end.x),
-      Math.max(b.start.x, b.end.x),
-    );
-    return overlap / Math.min(segmentLength(a), segmentLength(b)) > 0.85;
-  }
-
-  const xA = (a.start.x + a.end.x) / 2;
-  const xB = (b.start.x + b.end.x) / 2;
-  if (Math.abs(xA - xB) > 5) return false;
-  const overlap = rangesOverlap(
-    Math.min(a.start.y, a.end.y),
-    Math.max(a.start.y, a.end.y),
-    Math.min(b.start.y, b.end.y),
-    Math.max(b.start.y, b.end.y),
-  );
-  return overlap / Math.min(segmentLength(a), segmentLength(b)) > 0.85;
-}
-
-function dedupeSegments(segments) {
-  const sorted = [...segments].sort((a, b) => segmentLength(b) - segmentLength(a));
-  const unique = [];
-
-  for (const segment of sorted) {
-    if (!unique.some((existing) => areSimilarSegments(segment, existing))) {
-      unique.push(segment);
-    }
-  }
-
-  return unique;
-}
-
 function cloneDetectedSegment(segment) {
   return {
     start: clonePoint(segment.start),
@@ -1691,18 +1489,7 @@ function materializeDetectedSegments(append = false) {
   }
 }
 
-function detectionProfile(value = state.detectionSensitivity) {
-  const t = detectionSensitivityProgress(value);
-  const strictness = (1 - t) ** 2;
-  return {
-    minRunRatio: 0.02 + strictness * 0.28,
-    axisToleranceRatio: 0.001 + t * 0.01,
-    maxThicknessRatio: 0.004 + t * 0.06,
-  };
-}
-
 function detectImageSegmentsFromImage(sensitivity = state.detectionSensitivity) {
-  const profile = detectionProfile(sensitivity);
   const maxSide = 1400;
   const processScale = Math.min(1, maxSide / Math.max(state.image.width, state.image.height));
   const width = Math.max(1, Math.round(state.image.width * processScale));
@@ -1713,33 +1500,14 @@ function detectImageSegmentsFromImage(sensitivity = state.detectionSensitivity) 
   const offscreenContext = offscreen.getContext("2d", { willReadFrequently: true });
   offscreenContext.drawImage(state.image, 0, 0, width, height);
   const { data } = offscreenContext.getImageData(0, 0, width, height);
-
-  const grayscale = new Uint8Array(width * height);
-  for (let i = 0, pixel = 0; i < data.length; i += 4, pixel++) {
-    const alpha = data[i + 3] / 255;
-    const luma = Math.round((0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) * alpha + 255 * (1 - alpha));
-    grayscale[pixel] = luma;
-  }
-
-  const threshold = otsuThreshold(grayscale);
-  const binary = new Uint8Array(width * height);
-  for (let i = 0; i < grayscale.length; i++) {
-    binary[i] = grayscale[i] < threshold ? 1 : 0;
-  }
-
-  const minDimension = Math.min(width, height);
-  const minRun = Math.max(18, Math.round(minDimension * profile.minRunRatio));
-  const axisTolerance = Math.max(3, Math.round(minDimension * profile.axisToleranceRatio));
-  const maxThickness = Math.max(8, Math.round(minDimension * profile.maxThicknessRatio));
-
-  const horizontalGroups = mergeRuns(collectRuns(binary, width, height, true, minRun), axisTolerance);
-  const verticalGroups = mergeRuns(collectRuns(binary, width, height, false, minRun), axisTolerance);
-  const foundSegments = dedupeSegments([
-    ...groupsToSegments(horizontalGroups, true, minRun, maxThickness, processScale),
-    ...groupsToSegments(verticalGroups, false, minRun, maxThickness, processScale),
-  ]).slice(0, MAX_AUTO_SEGMENTS);
-
-  return foundSegments;
+  return analyzeImageData({
+    data,
+    width,
+    height,
+    processScale,
+    sensitivity,
+    maxSegments: MAX_AUTO_SEGMENTS,
+  });
 }
 
 function detectImageSegmentsWithWorker(sensitivity = state.detectionSensitivity) {
