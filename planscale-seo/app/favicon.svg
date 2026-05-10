@@ -1,10 +1,10 @@
 <svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
-  <title id="title">TrueScale refined mark</title>
+  <title id="title">TrueScale mark</title>
   <desc id="desc">Minimal image measurement mark for TrueScale.</desc>
-  <rect x="45" y="45" width="166" height="166" rx="38" fill="#FFFFFF" stroke="#D7DEE8" stroke-width="7"/>
-  <path d="M86 169L169 86" stroke="#2563EB" stroke-width="14" stroke-linecap="round"/>
-  <circle cx="86" cy="169" r="20" fill="#FFFFFF" stroke="#1F8A5F" stroke-width="11"/>
-  <circle cx="169" cy="86" r="20" fill="#FFFFFF" stroke="#2563EB" stroke-width="11"/>
-  <path d="M78 86H112" stroke="#D7DEE8" stroke-width="7" stroke-linecap="round"/>
-  <path d="M144 170H178" stroke="#D7DEE8" stroke-width="7" stroke-linecap="round"/>
+  <rect x="10" y="10" width="236" height="236" rx="50" fill="#FFFFFF" stroke="#D7DEE8" stroke-width="8"/>
+  <path d="M76 178L178 76" stroke="#2563EB" stroke-width="16" stroke-linecap="round"/>
+  <circle cx="76" cy="178" r="24" fill="#FFFFFF" stroke="#1F8A5F" stroke-width="12"/>
+  <circle cx="178" cy="76" r="24" fill="#FFFFFF" stroke="#2563EB" stroke-width="12"/>
+  <path d="M72 78H115" stroke="#D7DEE8" stroke-width="8" stroke-linecap="round"/>
+  <path d="M141 178H184" stroke="#D7DEE8" stroke-width="8" stroke-linecap="round"/>
 </svg>
