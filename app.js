@@ -74,10 +74,13 @@ const segmentsSortSelect = document.querySelector("#segmentsSortSelect");
 
 const CANVAS_COLORS = {
   selected: "#2563eb",
-  reference: "#0f8f73",
-  normal: "#4f6f8f",
-  angle: "#7768c8",
-  detected: "#6475d9",
+  reference: "#2f9e7e",
+  normal: "#5668d8",
+  angle: "#9ab7ef",
+  detected: "#8f9ee8",
+  guide: "rgba(142, 202, 230, 0.68)",
+  guideSoft: "rgba(142, 202, 230, 0.18)",
+  alignment: "rgba(154, 183, 239, 0.55)",
   leader: "rgba(79, 97, 120, 0.44)",
 };
 
@@ -1775,10 +1778,10 @@ function drawSegment(segment) {
   const isSelected = isSegmentSelected(segment);
   const isHovered = state.hoveredSegmentId === segment.id;
   const isAngleAligned = state.rightAngleIds.has(segment.id) || isGridAlignedSegment(segment);
-  const handleColor = isSelected
-    ? CANVAS_COLORS.selected
-    : isReference
-      ? CANVAS_COLORS.reference
+  const segmentColor = isReference
+    ? CANVAS_COLORS.reference
+    : isSelected
+      ? CANVAS_COLORS.selected
       : isAngleAligned
         ? CANVAS_COLORS.angle
         : CANVAS_COLORS.normal;
@@ -1786,19 +1789,13 @@ function drawSegment(segment) {
   ctx.beginPath();
   ctx.moveTo(start.x, start.y);
   ctx.lineTo(end.x, end.y);
-  ctx.lineWidth = isSelected ? 6 : isReference ? 4.5 : isHovered ? 4 : 3;
-  ctx.strokeStyle = isSelected
-    ? CANVAS_COLORS.selected
-    : isReference
-      ? CANVAS_COLORS.reference
-      : isAngleAligned
-        ? CANVAS_COLORS.angle
-        : CANVAS_COLORS.normal;
+  ctx.lineWidth = isReference ? (isSelected ? 5 : 4) : isSelected ? 4.8 : isHovered ? 3.6 : 3;
+  ctx.strokeStyle = segmentColor;
   ctx.stroke();
 
   const handleRadius = isCoarsePointer() && isSelected ? 9 : isSelected || isHovered ? 6 : 5;
-  drawHandle(segment.start, handleColor, handleRadius);
-  drawHandle(segment.end, handleColor, handleRadius);
+  drawHandle(segment.start, segmentColor, handleRadius);
+  drawHandle(segment.end, segmentColor, handleRadius);
 
   const midpoint = {
     x: (start.x + end.x) / 2,
@@ -1855,8 +1852,8 @@ function drawDetectedSegments() {
   if (!state.detectedSegments.length) return;
 
   ctx.save();
-  ctx.strokeStyle = "rgba(100, 117, 217, 0.5)";
-  ctx.fillStyle = "rgba(100, 117, 217, 0.42)";
+  ctx.strokeStyle = "rgba(143, 158, 232, 0.56)";
+  ctx.fillStyle = "rgba(143, 158, 232, 0.44)";
   ctx.lineWidth = 1.6;
   ctx.setLineDash([5, 6]);
 
@@ -1904,7 +1901,7 @@ function drawSnapPoint() {
   ctx.save();
   ctx.beginPath();
   ctx.arc(state.snapPoint.screen.x, state.snapPoint.screen.y, 9, 0, Math.PI * 2);
-  ctx.strokeStyle = CANVAS_COLORS.selected;
+  ctx.strokeStyle = CANVAS_COLORS.guide;
   ctx.lineWidth = 2;
   ctx.setLineDash([3, 3]);
   ctx.stroke();
@@ -1918,7 +1915,7 @@ function drawOrthogonalGuide() {
   const point = imageToScreen(state.orthogonalGuide.point);
 
   ctx.save();
-  ctx.strokeStyle = "rgba(119, 104, 200, 0.72)";
+  ctx.strokeStyle = CANVAS_COLORS.guide;
   ctx.lineWidth = 1.4;
   ctx.setLineDash([7, 6]);
   ctx.beginPath();
@@ -1928,9 +1925,9 @@ function drawOrthogonalGuide() {
   ctx.setLineDash([]);
   ctx.beginPath();
   ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(119, 104, 200, 0.18)";
+  ctx.fillStyle = CANVAS_COLORS.guideSoft;
   ctx.fill();
-  ctx.strokeStyle = "rgba(119, 104, 200, 0.88)";
+  ctx.strokeStyle = CANVAS_COLORS.guide;
   ctx.lineWidth = 1.2;
   ctx.stroke();
   ctx.restore();
@@ -1944,7 +1941,7 @@ function drawAlignmentGuide() {
     : [state.alignmentGuide];
 
   ctx.save();
-  ctx.strokeStyle = "rgba(37, 99, 235, 0.42)";
+  ctx.strokeStyle = CANVAS_COLORS.alignment;
   ctx.lineWidth = 1;
   ctx.setLineDash([4, 6]);
 
@@ -1964,9 +1961,9 @@ function drawAlignmentGuide() {
     ctx.setLineDash([]);
     ctx.beginPath();
     ctx.arc(targetScreen.x, targetScreen.y, 4, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(37, 99, 235, 0.12)";
+    ctx.fillStyle = "rgba(154, 183, 239, 0.16)";
     ctx.fill();
-    ctx.strokeStyle = "rgba(37, 99, 235, 0.62)";
+    ctx.strokeStyle = CANVAS_COLORS.alignment;
     ctx.stroke();
   }
 
@@ -1979,7 +1976,7 @@ function drawPendingPreview() {
   const start = imageToScreen(state.pendingPoint);
   const end = imageToScreen(state.previewPoint);
   ctx.save();
-  ctx.strokeStyle = "rgba(37, 99, 235, 0.72)";
+  ctx.strokeStyle = "rgba(86, 104, 216, 0.72)";
   ctx.lineWidth = 2;
   ctx.setLineDash([8, 7]);
   ctx.beginPath();
@@ -1994,7 +1991,7 @@ function drawRightAngleHints() {
   if (!state.rightAngleHints.length) return;
 
   ctx.save();
-  ctx.strokeStyle = "rgba(119, 104, 200, 0.64)";
+  ctx.strokeStyle = "rgba(154, 183, 239, 0.64)";
   ctx.lineWidth = 1.4;
 
   for (const hint of state.rightAngleHints) {
@@ -2276,11 +2273,12 @@ function renderExportCanvas({ withBackground, whiteBackground = false }) {
 
   for (const segment of state.segments) {
     const segmentColor = colorForSegment(segment);
+    const isReference = segment.id === state.referenceId;
     exportContext.beginPath();
     exportContext.moveTo(segment.start.x + layout.offsetX, segment.start.y + layout.offsetY);
     exportContext.lineTo(segment.end.x + layout.offsetX, segment.end.y + layout.offsetY);
     exportContext.strokeStyle = segmentColor;
-    exportContext.lineWidth = Math.max(2, 3 / viewScale);
+    exportContext.lineWidth = Math.max(isReference ? 2.5 : 2, (isReference ? 4 : 3) / viewScale);
     exportContext.stroke();
   }
 
@@ -2670,8 +2668,9 @@ function createSvgMarkup() {
 
   for (const segment of state.segments) {
     const color = colorForSegment(segment);
+    const isReference = segment.id === state.referenceId;
     lines.push(
-      `<line x1="${(segment.start.x + layout.offsetX).toFixed(2)}" y1="${(segment.start.y + layout.offsetY).toFixed(2)}" x2="${(segment.end.x + layout.offsetX).toFixed(2)}" y2="${(segment.end.y + layout.offsetY).toFixed(2)}" stroke="${color}" stroke-width="${Math.max(2, 3 / viewScale).toFixed(2)}"/>`,
+      `<line x1="${(segment.start.x + layout.offsetX).toFixed(2)}" y1="${(segment.start.y + layout.offsetY).toFixed(2)}" x2="${(segment.end.x + layout.offsetX).toFixed(2)}" y2="${(segment.end.y + layout.offsetY).toFixed(2)}" stroke="${color}" stroke-width="${Math.max(isReference ? 2.5 : 2, (isReference ? 4 : 3) / viewScale).toFixed(2)}"/>`,
     );
   }
 
