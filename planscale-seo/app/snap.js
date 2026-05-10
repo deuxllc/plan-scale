@@ -93,6 +93,21 @@ function findAxisAlignment(point, segments, segmentId, scale, { fieldCenter = po
   };
 }
 
+function nearOrthogonalAxis(point, anchor, toleranceDegrees = 12) {
+  const dx = point.x - anchor.x;
+  const dy = point.y - anchor.y;
+  const length = Math.hypot(dx, dy);
+  if (length < 1) return null;
+
+  const angle = Math.abs(Math.atan2(dy, dx) * 180 / Math.PI);
+  const normalized = angle > 180 ? angle - 180 : angle;
+  const horizontalError = Math.min(normalized, Math.abs(180 - normalized));
+  const verticalError = Math.abs(90 - normalized);
+  if (horizontalError <= toleranceDegrees) return "horizontal";
+  if (verticalError <= toleranceDegrees) return "vertical";
+  return null;
+}
+
 function resolvePointWithSnaps({
   rawPoint,
   fixedEndpoint = null,
@@ -108,22 +123,25 @@ function resolvePointWithSnaps({
   const endpointSnap = findExactEndpointSnap(rawPoint, segments, segmentId, scale);
 
   if (smartGridEnabled && fixedEndpoint) {
-    const ortho = snapToOrthogonalAxis(rawPoint, fixedEndpoint);
-    const lockAxis = ortho.axis === "horizontal" ? "horizontal" : "vertical";
-    const axisSnap = findAxisAlignment(ortho.point, segments, segmentId, scale, { fieldCenter: rawPoint, lockAxis });
-    const point = axisSnap ? axisSnap.point : ortho.point;
+    const axis = nearOrthogonalAxis(rawPoint, fixedEndpoint);
+    if (axis) {
+      const ortho = snapToOrthogonalAxis(rawPoint, fixedEndpoint);
+      const lockAxis = axis === "horizontal" ? "horizontal" : "vertical";
+      const axisSnap = findAxisAlignment(ortho.point, segments, segmentId, scale, { fieldCenter: rawPoint, lockAxis });
+      const point = axisSnap ? axisSnap.point : ortho.point;
 
-    return {
-      point,
-      snap: null,
-      guide: {
-        axis: ortho.axis,
-        anchor: clonePoint(fixedEndpoint),
-        point: clonePoint(point),
-      },
-      alignmentGuide: axisSnap ? axisSnap.guide : null,
-      axis: ortho.axis,
-    };
+      return {
+        point,
+        snap: null,
+        guide: {
+          axis,
+          anchor: clonePoint(fixedEndpoint),
+          point: clonePoint(point),
+        },
+        alignmentGuide: axisSnap ? axisSnap.guide : null,
+        axis,
+      };
+    }
   }
 
   if (endpointSnap) {

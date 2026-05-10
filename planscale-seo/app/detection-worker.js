@@ -1,12 +1,23 @@
 self.addEventListener("message", (event) => {
   if (event.data?.type !== "analyze") return;
-  const { width, height, processScale, maxSegments, buffer } = event.data;
+  const { width, height, processScale, maxSegments, sensitivity, buffer } = event.data;
   const data = new Uint8ClampedArray(buffer);
-  const segments = analyze(data, width, height, processScale).slice(0, maxSegments || 150);
+  const segments = analyze(data, width, height, processScale, sensitivity).slice(0, maxSegments || 150);
   self.postMessage({ type: "result", segments });
 });
 
-function analyze(data, width, height, processScale) {
+function detectionProfile(name) {
+  if (name === "clear") {
+    return { minRunRatio: 0.055, axisToleranceRatio: 0.005, maxThicknessRatio: 0.025 };
+  }
+  if (name === "detailed") {
+    return { minRunRatio: 0.022, axisToleranceRatio: 0.008, maxThicknessRatio: 0.05 };
+  }
+  return { minRunRatio: 0.035, axisToleranceRatio: 0.006, maxThicknessRatio: 0.035 };
+}
+
+function analyze(data, width, height, processScale, sensitivity) {
+  const profile = detectionProfile(sensitivity);
   const grayscale = new Uint8Array(width * height);
   for (let i = 0, pixel = 0; i < data.length; i += 4, pixel++) {
     const alpha = data[i + 3] / 255;
@@ -21,9 +32,9 @@ function analyze(data, width, height, processScale) {
   }
 
   const minDimension = Math.min(width, height);
-  const minRun = Math.max(24, Math.round(minDimension * 0.035));
-  const axisTolerance = Math.max(3, Math.round(minDimension * 0.006));
-  const maxThickness = Math.max(10, Math.round(minDimension * 0.035));
+  const minRun = Math.max(18, Math.round(minDimension * profile.minRunRatio));
+  const axisTolerance = Math.max(3, Math.round(minDimension * profile.axisToleranceRatio));
+  const maxThickness = Math.max(8, Math.round(minDimension * profile.maxThicknessRatio));
   const horizontalGroups = mergeRuns(collectRuns(binary, width, height, true, minRun), axisTolerance);
   const verticalGroups = mergeRuns(collectRuns(binary, width, height, false, minRun), axisTolerance);
 

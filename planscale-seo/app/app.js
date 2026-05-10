@@ -71,6 +71,21 @@ const chooseBaseButton = document.querySelector("#chooseBaseButton");
 const baseSegmentName = document.querySelector("#baseSegmentName");
 const baseSegmentMeta = document.querySelector("#baseSegmentMeta");
 const segmentsSortSelect = document.querySelector("#segmentsSortSelect");
+const backgroundOpacityInput = document.querySelector("#backgroundOpacityInput");
+const backgroundOpacityValue = document.querySelector("#backgroundOpacityValue");
+const toggleBackgroundOpacityButton = document.querySelector("#toggleBackgroundOpacityButton");
+const inlineCalibration = document.querySelector("#inlineCalibration");
+const inlineReferenceLengthInput = document.querySelector("#inlineReferenceLengthInput");
+const inlineUnitInput = document.querySelector("#inlineUnitInput");
+const nextActionPanel = document.querySelector("#nextActionPanel");
+const manualModeButton = document.querySelector("#manualModeButton");
+const detectModeButton = document.querySelector("#detectModeButton");
+const detectionSensitivityInput = document.querySelector("#detectionSensitivityInput");
+const scaleRuler = document.querySelector("#scaleRuler");
+const scaleRulerValue = document.querySelector("#scaleRulerValue");
+const scaleRulerLine = document.querySelector("#scaleRulerLine");
+const scaleRulerZoom = document.querySelector("#scaleRulerZoom");
+const scaleRulerResetButton = document.querySelector("#scaleRulerResetButton");
 
 const CANVAS_COLORS = {
   selected: "#2563eb",
@@ -86,7 +101,10 @@ const state = {
   imageSrc: "",
   imageName: "",
   backgroundVisible: true,
+  backgroundOpacity: 1,
+  previousBackgroundOpacity: 1,
   scale: 1,
+  homeScale: 1,
   offsetX: 0,
   offsetY: 0,
   segments: [],
@@ -109,7 +127,9 @@ const state = {
   rightAngleHints: [],
   rightAngleIds: new Set(),
   detectedSegments: [],
-  smartGridEnabled: false,
+  smartGridEnabled: true,
+  nextActionPromptVisible: false,
+  detectionSensitivity: detectionSensitivityInput?.value || "balanced",
   isDrawingSegments: false,
   isChoosingBase: false,
   sidebarCollapsed: true,
@@ -152,7 +172,39 @@ function setUnitInputValue(value) {
     unitInput.add(new Option(unit, unit));
   }
   unitInput.value = unit;
+  if (inlineUnitInput instanceof HTMLSelectElement) {
+    const hasInlineUnitOption = Array.from(inlineUnitInput.options).some((option) => option.value === unit);
+    if (!hasInlineUnitOption) {
+      inlineUnitInput.add(new Option(unit, unit));
+    }
+    inlineUnitInput.value = unit;
+  }
   return unitInput.value || unit;
+}
+
+function setBackgroundOpacity(value, { remember = true } = {}) {
+  const opacity = Math.min(1, Math.max(0, Number.isFinite(value) ? value : 1));
+  if (remember && opacity > 0.02) {
+    state.previousBackgroundOpacity = opacity;
+  }
+  state.backgroundOpacity = opacity;
+  state.backgroundVisible = opacity > 0.02;
+}
+
+function updateBackgroundOpacityControls() {
+  if (backgroundOpacityInput) {
+    backgroundOpacityInput.value = String(Math.round(state.backgroundOpacity * 100));
+    backgroundOpacityInput.disabled = !state.image;
+  }
+  if (backgroundOpacityValue) {
+    backgroundOpacityValue.textContent = `${Math.round(state.backgroundOpacity * 100)}%`;
+  }
+  if (toggleBackgroundOpacityButton) {
+    toggleBackgroundOpacityButton.disabled = !state.image;
+    toggleBackgroundOpacityButton.title = state.backgroundVisible ? "Скрыть подложку" : "Показать подложку";
+    toggleBackgroundOpacityButton.setAttribute("aria-label", toggleBackgroundOpacityButton.title);
+    toggleBackgroundOpacityButton.setAttribute("aria-pressed", String(!state.backgroundVisible));
+  }
 }
 
 function clonePoint(point) {
@@ -175,7 +227,10 @@ function snapshotState() {
     imageSrc: state.imageSrc,
     imageName: state.imageName,
     backgroundVisible: state.backgroundVisible,
+    backgroundOpacity: state.backgroundOpacity,
+    previousBackgroundOpacity: state.previousBackgroundOpacity,
     scale: state.scale,
+    homeScale: state.homeScale,
     offsetX: state.offsetX,
     offsetY: state.offsetY,
     segments: state.segments.map(cloneSegment),
@@ -185,6 +240,7 @@ function snapshotState() {
     unit: state.unit,
     footnotesVisible: state.footnotesVisible,
     smartGridEnabled: state.smartGridEnabled,
+    detectionSensitivity: state.detectionSensitivity,
     isDrawingSegments: state.isDrawingSegments,
     isChoosingBase: state.isChoosingBase,
     nextSegmentId,
@@ -212,11 +268,19 @@ async function applySnapshot(snapshot) {
     state.imageSrc = snapshot.imageSrc || "";
     state.imageName = snapshot.imageName || "";
     state.backgroundVisible = snapshot.backgroundVisible ?? true;
+    state.backgroundOpacity = typeof snapshot.backgroundOpacity === "number"
+      ? Math.min(1, Math.max(0, snapshot.backgroundOpacity))
+      : (state.backgroundVisible ? 1 : 0);
+    state.previousBackgroundOpacity = typeof snapshot.previousBackgroundOpacity === "number"
+      ? Math.min(1, Math.max(0.05, snapshot.previousBackgroundOpacity))
+      : 1;
+    state.backgroundVisible = state.backgroundOpacity > 0;
     state.image = imageChanged ? await loadImage(state.imageSrc) : state.image;
     if (!state.imageSrc) {
       state.image = null;
     }
     state.scale = snapshot.scale || 1;
+    state.homeScale = snapshot.homeScale || state.scale || 1;
     state.offsetX = snapshot.offsetX || 0;
     state.offsetY = snapshot.offsetY || 0;
     state.segments = (snapshot.segments || []).map((segment) => ({
@@ -239,7 +303,9 @@ async function applySnapshot(snapshot) {
     state.rightAngleHints = [];
     state.rightAngleIds = new Set();
     state.detectedSegments = [];
-    state.smartGridEnabled = Boolean(snapshot.smartGridEnabled);
+    state.smartGridEnabled = true;
+    state.detectionSensitivity = snapshot.detectionSensitivity || "balanced";
+    state.nextActionPromptVisible = false;
     state.isDrawingSegments = Boolean(snapshot.isDrawingSegments);
     state.isChoosingBase = Boolean(snapshot.isChoosingBase);
     state.isSpacePressed = false;
@@ -250,6 +316,9 @@ async function applySnapshot(snapshot) {
 
     referenceLengthInput.value = state.referenceValue;
     setUnitInputValue(state.unit);
+    if (inlineReferenceLengthInput) inlineReferenceLengthInput.value = state.referenceValue;
+    if (inlineUnitInput) inlineUnitInput.value = state.unit;
+    if (detectionSensitivityInput) detectionSensitivityInput.value = state.detectionSensitivity;
     smartGridToggle.checked = state.smartGridEnabled;
     updateToolControls();
     emptyState.hidden = Boolean(state.image);
@@ -383,24 +452,25 @@ function updateToolControls() {
     hideCursorCoordinates();
   }
 
+  updateBackgroundOpacityControls();
   const underlayLabel = removeUnderlayButton.querySelector("span");
   if (underlayLabel) {
     underlayLabel.textContent = !state.image
       ? "Подложка"
       : state.backgroundVisible
-        ? "Скрыть план"
-        : "Показать план";
+        ? "Скрыть"
+        : "Показать";
   }
   removeUnderlayButton.setAttribute("aria-pressed", String(Boolean(state.image && !state.backgroundVisible)));
   removeUnderlayButton.title = !state.image
-    ? "Сначала загрузите изображение плана"
+    ? "Сначала загрузите изображение"
     : state.backgroundVisible
-      ? "Скрыть загруженную подложку, оставив разметку"
-      : "Вернуть загруженную подложку";
+      ? "Быстро скрыть подложку"
+      : "Вернуть прозрачность подложки";
   removeUnderlayButton.setAttribute(
     "aria-label",
     !state.image
-      ? "Сначала загрузите изображение плана"
+      ? "Сначала загрузите изображение"
       : state.backgroundVisible
         ? "Скрыть подложку"
         : "Показать подложку",
@@ -417,14 +487,14 @@ function updateToolControls() {
   focusReferenceButton.hidden = !hasBase;
   focusBaseInputButton.disabled = !hasBase;
   chooseBaseButton.disabled = !state.segments.length;
-  chooseBaseButton.textContent = hasBase ? "Изменить отрезок" : "Выбрать отрезок";
+  chooseBaseButton.textContent = hasBase ? "Перекалибровать" : "Выбрать отрезок";
   const sidebarLocked = isMobileLayout() && state.image && !baseLengthComplete;
   sidebarToggleButton.disabled = sidebarLocked;
   sidebarToggleButton.title = sidebarLocked
-    ? "Сначала выберите базовый отрезок и задайте длину"
+    ? "Сначала задайте масштаб"
     : state.sidebarCollapsed
-      ? "Показать список отрезков"
-      : "Скрыть список отрезков";
+      ? "Показать измерения"
+      : "Скрыть измерения";
   sidebarToggleButton.setAttribute("aria-label", sidebarToggleButton.title);
   syncCalibrationPlacement();
 }
@@ -440,21 +510,100 @@ function updateGuidanceControls() {
     addDetectedButton.hidden = !hasCurrentMarkup;
   }
 
-  const needsBase = Boolean(state.image && state.segments.length && !state.referenceId);
+  const needsBase = Boolean(state.image && !state.referenceId);
   const needsLength = Boolean(state.image && state.segments.length && state.referenceId && parseDecimal(state.referenceValue) === null);
   calibrationHint.hidden = !needsBase && !needsLength;
   if (needsBase) {
-    calibrationHintTitle.textContent = "Выберите базовый отрезок";
-    calibrationHintText.textContent = "Кликните по известному отрезку на плане или в списке. После выбора появится ввод реальной длины.";
+    calibrationHintTitle.textContent = "Задайте масштаб";
+    calibrationHintText.textContent = state.pendingPoint
+      ? "Поставьте вторую точку на известном размере."
+      : "Проведите отрезок по известному размеру на изображении.";
   } else if (needsLength) {
     calibrationHintTitle.textContent = "Введите базовый размер";
-    calibrationHintText.textContent = "Введите реальную длину выбранного базового отрезка, чтобы пересчитать остальные размеры.";
+    calibrationHintText.textContent = "Введите реальную длину рядом с базовым отрезком и нажмите OK.";
   }
   referenceField?.classList.toggle("needs-attention", needsBase || needsLength);
   referenceLengthInput.setAttribute("aria-invalid", String(needsLength && state.referenceValue.trim().length > 0));
   if (baseConfirm) {
     baseConfirm.hidden = !state.pendingReferenceId;
   }
+}
+
+function syncCanvasOverlays() {
+  syncInlineCalibration();
+  syncNextActionPanel();
+  syncScaleRuler();
+}
+
+function syncInlineCalibration() {
+  if (!inlineCalibration) return;
+
+  const reference = state.segments.find((segment) => segment.id === state.referenceId);
+  const needsLength = Boolean(state.image && reference && parseDecimal(state.referenceValue) === null);
+  inlineCalibration.hidden = !needsLength;
+  if (!needsLength) return;
+
+  const start = imageToScreen(reference.start);
+  const end = imageToScreen(reference.end);
+  const midpoint = {
+    x: (start.x + end.x) / 2,
+    y: (start.y + end.y) / 2,
+  };
+  const rect = wrap.getBoundingClientRect();
+  const ownRect = inlineCalibration.getBoundingClientRect();
+  const width = ownRect.width || 230;
+  const height = ownRect.height || 88;
+  const x = Math.min(Math.max(12, midpoint.x - width / 2), Math.max(12, rect.width - width - 12));
+  const y = Math.min(Math.max(12, midpoint.y + 22), Math.max(12, rect.height - height - 12));
+  inlineCalibration.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+}
+
+function syncNextActionPanel() {
+  if (!nextActionPanel) return;
+  const shouldShow = Boolean(
+    state.image
+    && hasCompleteBaseLength()
+    && state.nextActionPromptVisible
+    && !state.detectedSegments.length
+    && !state.isAnalyzing,
+  );
+  nextActionPanel.hidden = !shouldShow;
+}
+
+function realValueCandidates() {
+  return [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
+}
+
+function syncScaleRuler() {
+  if (!scaleRuler || !scaleRulerLine || !scaleRulerValue || !scaleRulerZoom) return;
+
+  const reference = state.segments.find((segment) => segment.id === state.referenceId);
+  const referenceValue = parseDecimal(state.referenceValue);
+  if (!state.image || !reference || referenceValue === null || referenceValue <= 0) {
+    scaleRuler.hidden = true;
+    return;
+  }
+
+  const pixelsPerUnit = segmentLength(reference) * state.scale / referenceValue;
+  if (!Number.isFinite(pixelsPerUnit) || pixelsPerUnit <= 0) {
+    scaleRuler.hidden = true;
+    return;
+  }
+
+  const candidates = realValueCandidates().map((value) => ({
+    value,
+    width: value * pixelsPerUnit,
+  }));
+  const visible = candidates
+    .filter((item) => item.width >= 56 && item.width <= 180)
+    .sort((a, b) => Math.abs(a.width - 116) - Math.abs(b.width - 116))[0]
+    || candidates.sort((a, b) => Math.abs(a.width - 116) - Math.abs(b.width - 116))[0];
+
+  scaleRuler.hidden = false;
+  scaleRulerLine.style.width = `${Math.round(Math.min(180, Math.max(48, visible.width)))}px`;
+  scaleRulerValue.textContent = `${formatDecimal(visible.value)} ${state.unit.trim() || "ед."}`;
+  const homeScale = state.homeScale || state.scale || 1;
+  scaleRulerZoom.textContent = `${Math.round((state.scale / homeScale) * 100)}%`;
 }
 
 function commitHistory() {
@@ -493,7 +642,7 @@ async function restoreSavedState() {
   if (restoreSharedStateFromHash()) {
     updateAll();
     commitHistory();
-    showToast("Разметка из ссылки загружена. Теперь добавьте тот же план.");
+    showToast("Разметка из ссылки загружена. Теперь добавьте то же изображение.");
     return;
   }
 
@@ -548,13 +697,17 @@ function syncCanvasAfterLayout({ fit = false } = {}) {
 }
 
 function fitImage() {
-  if (!state.image) return;
+  if (!state.image) {
+    syncCanvasOverlays();
+    return;
+  }
 
   const rect = wrap.getBoundingClientRect();
   const padding = 36;
   const usableWidth = Math.max(1, rect.width - padding * 2);
   const usableHeight = Math.max(1, rect.height - padding * 2);
   state.scale = Math.min(usableWidth / state.image.width, usableHeight / state.image.height);
+  state.homeScale = state.scale || 1;
   state.offsetX = (rect.width - state.image.width * state.scale) / 2;
   state.offsetY = (rect.height - state.image.height * state.scale) / 2;
   draw();
@@ -1064,8 +1217,9 @@ function setReferenceSegment(id, { focusLength = true } = {}) {
   updateAll();
   commitHistory();
   if (focusLength) {
-    referenceLengthInput.focus();
-    referenceLengthInput.select();
+    const target = inlineCalibration && !inlineCalibration.hidden ? inlineReferenceLengthInput : referenceLengthInput;
+    target?.focus();
+    target?.select();
   }
 }
 
@@ -1416,12 +1570,14 @@ function materializeDetectedSegments(append = false) {
   if (!state.detectedSegments.length) return;
 
   const detected = state.detectedSegments.map(cloneDetectedSegment);
+  const reference = state.segments.find((segment) => segment.id === state.referenceId);
+  const referenceValue = state.referenceValue;
   if (!append) {
-    state.segments = [];
-    state.referenceId = null;
-    state.referenceValue = "";
-    referenceLengthInput.value = "";
-    nextSegmentId = 1;
+    state.segments = reference ? [cloneSegment(reference)] : [];
+    state.referenceId = reference ? reference.id : null;
+    state.referenceValue = reference ? referenceValue : "";
+    referenceLengthInput.value = state.referenceValue;
+    nextSegmentId = Math.max(1, ...state.segments.map((segment) => segment.id + 1), 1);
     clearSelection();
   }
 
@@ -1455,7 +1611,18 @@ function materializeDetectedSegments(append = false) {
   }
 }
 
-function detectImageSegmentsFromImage() {
+function detectionProfile(name = state.detectionSensitivity) {
+  if (name === "clear") {
+    return { minRunRatio: 0.055, axisToleranceRatio: 0.005, maxThicknessRatio: 0.025 };
+  }
+  if (name === "detailed") {
+    return { minRunRatio: 0.022, axisToleranceRatio: 0.008, maxThicknessRatio: 0.05 };
+  }
+  return { minRunRatio: 0.035, axisToleranceRatio: 0.006, maxThicknessRatio: 0.035 };
+}
+
+function detectImageSegmentsFromImage(sensitivity = state.detectionSensitivity) {
+  const profile = detectionProfile(sensitivity);
   const maxSide = 1400;
   const processScale = Math.min(1, maxSide / Math.max(state.image.width, state.image.height));
   const width = Math.max(1, Math.round(state.image.width * processScale));
@@ -1481,9 +1648,9 @@ function detectImageSegmentsFromImage() {
   }
 
   const minDimension = Math.min(width, height);
-  const minRun = Math.max(24, Math.round(minDimension * 0.035));
-  const axisTolerance = Math.max(3, Math.round(minDimension * 0.006));
-  const maxThickness = Math.max(10, Math.round(minDimension * 0.035));
+  const minRun = Math.max(18, Math.round(minDimension * profile.minRunRatio));
+  const axisTolerance = Math.max(3, Math.round(minDimension * profile.axisToleranceRatio));
+  const maxThickness = Math.max(8, Math.round(minDimension * profile.maxThicknessRatio));
 
   const horizontalGroups = mergeRuns(collectRuns(binary, width, height, true, minRun), axisTolerance);
   const verticalGroups = mergeRuns(collectRuns(binary, width, height, false, minRun), axisTolerance);
@@ -1495,7 +1662,7 @@ function detectImageSegmentsFromImage() {
   return foundSegments;
 }
 
-function detectImageSegmentsWithWorker() {
+function detectImageSegmentsWithWorker(sensitivity = state.detectionSensitivity) {
   return new Promise((resolve, reject) => {
     const maxSide = 1400;
     const processScale = Math.min(1, maxSide / Math.max(state.image.width, state.image.height));
@@ -1529,17 +1696,20 @@ function detectImageSegmentsWithWorker() {
       height,
       processScale,
       maxSegments: MAX_AUTO_SEGMENTS,
+      sensitivity,
       buffer: imageData.data.buffer,
     }, [imageData.data.buffer]);
   });
 }
 
-function analyzeImageSegments({ automatic = false } = {}) {
+function analyzeImageSegments({ automatic = false, sensitivity = state.detectionSensitivity } = {}) {
   if (!state.image) {
-    showToast("Сначала загрузите план");
+    showToast("Сначала загрузите изображение");
     return;
   }
 
+  state.detectionSensitivity = sensitivity;
+  if (detectionSensitivityInput) detectionSensitivityInput.value = sensitivity;
   const runId = ++analysisRunId;
   state.isAnalyzing = true;
   state.detectedSegments = [];
@@ -1559,12 +1729,12 @@ function analyzeImageSegments({ automatic = false } = {}) {
     const canUseWorker = typeof Worker !== "undefined" && window.location.protocol !== "file:";
     try {
       foundSegments = canUseWorker
-        ? await detectImageSegmentsWithWorker()
-        : detectImageSegmentsFromImage();
+        ? await detectImageSegmentsWithWorker(sensitivity)
+        : detectImageSegmentsFromImage(sensitivity);
     } catch {
       if (canUseWorker) {
         try {
-          foundSegments = detectImageSegmentsFromImage();
+          foundSegments = detectImageSegmentsFromImage(sensitivity);
         } catch {
           analysisFailed = true;
         }
@@ -1811,7 +1981,7 @@ function drawSegment(segment) {
   }
 
   const label = labelTextFor(segment);
-  const labelFontSize = state.scale > 3 ? 8 : 10;
+  const labelFontSize = state.scale > 3 ? 9 : 11;
   ctx.font = `400 ${labelFontSize}px 'DM Sans', Inter, system-ui, sans-serif`;
   const metrics = ctx.measureText(label);
   const labelWidth = metrics.width + 12;
@@ -2049,7 +2219,10 @@ function drawHintPill(text, x, y) {
 }
 
 function drawCanvasHints() {
-  if (!state.image) return;
+  if (!state.image) {
+    syncCanvasOverlays();
+    return;
+  }
 
   const rect = canvas.getBoundingClientRect();
   if (!state.segments.length && !state.detectedSegments.length && !state.isAnalyzing) {
@@ -2057,7 +2230,7 @@ function drawCanvasHints() {
   }
 
   if (state.isChoosingBase && state.segments.length) {
-    drawHintPill("Выберите базовый отрезок", rect.width / 2, 42);
+    drawHintPill("Задайте масштаб", rect.width / 2, 42);
   }
 
   if (state.pendingPoint && state.previewPoint) {
@@ -2089,7 +2262,10 @@ function draw() {
   const rect = canvas.getBoundingClientRect();
   ctx.clearRect(0, 0, rect.width, rect.height);
 
-  if (!state.image) return;
+  if (!state.image) {
+    syncCanvasOverlays();
+    return;
+  }
 
   state.labelBounds = new Map();
   const rightAngles = computeRightAngleHints();
@@ -2099,6 +2275,7 @@ function draw() {
   ctx.save();
   ctx.imageSmoothingEnabled = true;
   if (state.backgroundVisible) {
+    ctx.globalAlpha = state.backgroundOpacity;
     ctx.drawImage(
       state.image,
       state.offsetX,
@@ -2142,6 +2319,7 @@ function draw() {
   drawSelectionBox();
   drawSnapPoint();
   drawCanvasHints();
+  syncCanvasOverlays();
 }
 
 function exportLabelOffset(segment, labelWidth, labelHeight, usedBounds, viewScale) {
@@ -2202,7 +2380,7 @@ function createExportLayout(viewScale) {
 
   const measureCanvas = document.createElement("canvas");
   const measureContext = measureCanvas.getContext("2d");
-  const fontSize = Math.max(8, 9 / viewScale);
+  const fontSize = Math.max(9, 10 / viewScale);
   const horizontalPadding = 9 / viewScale;
   const labelHeight = 15 / viewScale;
   measureContext.font = `400 ${fontSize}px Inter, system-ui, sans-serif`;
@@ -2268,7 +2446,10 @@ function renderExportCanvas({ withBackground, whiteBackground = false }) {
     exportContext.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
   }
   if (withBackground) {
+    exportContext.save();
+    exportContext.globalAlpha = state.backgroundOpacity;
     exportContext.drawImage(state.image, layout.offsetX, layout.offsetY);
+    exportContext.restore();
   }
 
   exportContext.lineCap = "round";
@@ -2450,13 +2631,13 @@ function initWelcome() {
 }
 
 function safeExportName(extension, withBackground) {
-  const base = (state.imageName || "plan")
+  const base = (state.imageName || "image")
     .replace(/\.[^.]+$/, "")
     .replace(/[^a-z0-9а-яё_-]+/gi, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
-    || "plan";
-  return `${base}-${withBackground ? "with-plan" : "segments"}.${extension}`;
+    || "image";
+  return `${base}-${withBackground ? "with-image" : "measurements"}.${extension}`;
 }
 
 async function exportPng(withBackground) {
@@ -2467,7 +2648,7 @@ async function exportPng(withBackground) {
   }
   const exportCanvas = renderExportCanvas({ withBackground });
   if (!exportCanvas) {
-    showToast("Сначала загрузите план");
+    showToast("Сначала загрузите изображение");
     return;
   }
 
@@ -2537,7 +2718,7 @@ async function exportPdf(withBackground) {
   }
   const exportCanvas = renderExportCanvas({ withBackground, whiteBackground: true });
   if (!exportCanvas) {
-    showToast("Сначала загрузите план");
+    showToast("Сначала загрузите изображение");
     return;
   }
 
@@ -2744,7 +2925,7 @@ function renderPanelSummary() {
   const count = state.segments.length;
   const base = state.referenceId ? "база выбрана" : "база не выбрана";
   const unit = state.unit.trim() || "без единицы";
-  panelSummary.textContent = `${count} ${plural(count, "отрезок", "отрезка", "отрезков")} · ${base} · ${unit}`;
+  panelSummary.textContent = `${count} ${plural(count, "измерение", "измерения", "измерений")} · ${base} · ${unit}`;
 }
 
 function renderBaseSummary() {
@@ -2754,8 +2935,8 @@ function renderBaseSummary() {
   if (!reference) {
     baseSegmentName.textContent = "Не выбран";
     baseSegmentMeta.textContent = state.segments.length
-      ? "Выберите известный отрезок на плане или в списке."
-      : "Добавьте отрезок и задайте одну известную длину.";
+      ? "Выберите известный отрезок на изображении или в списке."
+      : "Проведите отрезок по известному размеру на изображении.";
     baseSegmentName.classList.toggle("pending", state.segments.length > 0);
     return;
   }
@@ -2765,7 +2946,7 @@ function renderBaseSummary() {
   baseSegmentName.classList.remove("pending");
   baseSegmentMeta.textContent = realValue === null
     ? `${formatDecimal(segmentLength(reference))} px · введите реальную длину`
-    : `${formatLength(realValue)} · ${formatDecimal(segmentLength(reference))} px на плане`;
+    : `${formatLength(realValue)} · ${formatDecimal(segmentLength(reference))} px на изображении`;
 }
 
 function renderSegments() {
@@ -2816,7 +2997,7 @@ function renderOutput() {
 
 function updateStatus() {
   if (!state.image) {
-    statusText.textContent = "Загрузите изображение плана";
+    statusText.textContent = "Загрузите изображение";
     return;
   }
 
@@ -2834,8 +3015,12 @@ function updateStatus() {
   const detectedState = state.detectedSegments.length ? ` · предпросмотр ${state.detectedSegments.length}` : "";
   const underlayState = state.backgroundVisible ? "" : " · подложка скрыта";
   const drawingState = state.isDrawingSegments ? " · добавление отрезков" : "";
-  const baseState = count && !state.referenceId ? " · выберите базовый отрезок" : "";
-  statusText.textContent = `План готов${detectedState}${baseState}${underlayState}${drawingState}`;
+  const baseState = !state.referenceId
+    ? " · задайте масштаб"
+    : parseDecimal(state.referenceValue) === null
+      ? " · введите базовый размер"
+      : "";
+  statusText.textContent = `Изображение готово${detectedState}${baseState}${underlayState}${drawingState}`;
 }
 
 function plural(value, one, few, many) {
@@ -2886,7 +3071,12 @@ function addPoint(point) {
 
   state.segments.push(segment);
   if (!state.referenceId) {
-    state.isChoosingBase = true;
+    state.referenceId = id;
+    state.referenceValue = "";
+    referenceLengthInput.value = "";
+    if (inlineReferenceLengthInput) inlineReferenceLengthInput.value = "";
+    state.isChoosingBase = false;
+    state.isDrawingSegments = false;
   }
   state.pendingPoint = null;
   state.previewPoint = null;
@@ -2895,6 +3085,12 @@ function addPoint(point) {
   selectOnlySegment(id);
   updateAll();
   commitHistory();
+  if (state.referenceId === id && parseDecimal(state.referenceValue) === null) {
+    window.setTimeout(() => {
+      inlineReferenceLengthInput?.focus();
+      inlineReferenceLengthInput?.select();
+    }, 40);
+  }
 }
 
 function deleteSegment(id) {
@@ -2913,6 +3109,7 @@ function deleteSegments(ids) {
     state.referenceId = null;
     state.referenceValue = "";
     referenceLengthInput.value = "";
+    if (inlineReferenceLengthInput) inlineReferenceLengthInput.value = "";
     state.isChoosingBase = state.segments.length > 0;
   }
   if (idsToDelete.has(state.pendingReferenceId)) {
@@ -2925,7 +3122,7 @@ function deleteSegments(ids) {
 
 function resetPlan() {
   if (!state.image && !state.segments.length && !state.detectedSegments.length) return;
-  const confirmed = window.confirm("Удалить план, все отрезки и настройки?");
+  const confirmed = window.confirm("Удалить изображение, все измерения и настройки?");
   if (!confirmed) return;
 
   analysisRunId++;
@@ -2934,7 +3131,10 @@ function resetPlan() {
   state.imageSrc = "";
   state.imageName = "";
   state.backgroundVisible = true;
+  state.backgroundOpacity = 1;
+  state.previousBackgroundOpacity = 1;
   state.scale = 1;
+  state.homeScale = 1;
   state.offsetX = 0;
   state.offsetY = 0;
   state.segments = [];
@@ -2959,6 +3159,7 @@ function resetPlan() {
   state.rightAngleIds = new Set();
   state.isDrawingSegments = false;
   state.isChoosingBase = false;
+  state.nextActionPromptVisible = false;
   state.isAnalyzing = false;
   state.hoveredSegmentId = null;
   nextSegmentId = 1;
@@ -2975,7 +3176,7 @@ function resetPlan() {
   updateAll();
   syncCanvasAfterLayout();
   commitHistory();
-  showToast("План удалён");
+  showToast("Изображение удалено");
 }
 
 function showToast(message) {
@@ -2990,7 +3191,7 @@ function shouldReplaceCurrentPlan() {
   if (!state.image || (!state.segments.length && !state.detectedSegments.length)) {
     return true;
   }
-  return window.confirm("Заменить план? Текущая разметка будет очищена.");
+  return window.confirm("Заменить изображение? Текущая разметка будет очищена.");
 }
 
 function loadImageFile(file) {
@@ -3012,12 +3213,13 @@ function loadImageFile(file) {
       state.image = image;
       state.imageSrc = String(reader.result);
       state.imageName = file.name;
-      state.backgroundVisible = true;
+      setBackgroundOpacity(1);
       if (!preserveExistingMarkup) {
         state.segments = [];
         state.referenceId = null;
         state.referenceValue = "";
         referenceLengthInput.value = "";
+        if (inlineReferenceLengthInput) inlineReferenceLengthInput.value = "";
         state.isChoosingBase = false;
         clearSelection();
       }
@@ -3026,7 +3228,8 @@ function loadImageFile(file) {
       state.pendingReferenceId = null;
       state.previewPoint = null;
       state.orthogonalGuide = null;
-      state.isDrawingSegments = false;
+      state.isDrawingSegments = !preserveExistingMarkup;
+      state.nextActionPromptVisible = false;
       state.isAnalyzing = false;
       state.hoveredSegmentId = null;
       emptyState.hidden = true;
@@ -3035,9 +3238,6 @@ function loadImageFile(file) {
       fitImage();
       updateAll();
       commitHistory();
-      if (!preserveExistingMarkup) {
-        window.setTimeout(() => analyzeImageSegments({ automatic: true }), 180);
-      }
     });
     image.addEventListener("error", () => showToast("Не удалось прочитать изображение"), { once: true });
     image.src = reader.result;
@@ -3087,8 +3287,14 @@ cancelDetectedButton.addEventListener("click", () => {
   clearDetectedSegments();
   showToast("Найденные отрезки отменены");
 });
-focusReferenceButton.addEventListener("click", () => referenceLengthInput.focus());
-focusBaseInputButton.addEventListener("click", () => referenceLengthInput.focus());
+focusReferenceButton.addEventListener("click", () => {
+  const target = inlineCalibration && !inlineCalibration.hidden ? inlineReferenceLengthInput : referenceLengthInput;
+  target?.focus();
+});
+focusBaseInputButton.addEventListener("click", () => {
+  const target = inlineCalibration && !inlineCalibration.hidden ? inlineReferenceLengthInput : referenceLengthInput;
+  target?.focus();
+});
 chooseBaseButton.addEventListener("click", startChoosingBase);
 confirmBaseButton?.addEventListener("click", confirmPendingReference);
 cancelBaseButton?.addEventListener("click", () => {
@@ -3114,12 +3320,17 @@ drawSegmentButton.addEventListener("click", () => {
 
 reanalyzeButton.addEventListener("click", () => {
   if (!state.image || state.isAnalyzing) return;
-  analyzeImageSegments({ automatic: false });
+  state.nextActionPromptVisible = false;
+  analyzeImageSegments({ automatic: false, sensitivity: state.detectionSensitivity });
 });
 
 removeUnderlayButton.addEventListener("click", () => {
   if (!state.image) return;
-  state.backgroundVisible = !state.backgroundVisible;
+  if (state.backgroundVisible) {
+    setBackgroundOpacity(0, { remember: false });
+  } else {
+    setBackgroundOpacity(state.previousBackgroundOpacity || 1);
+  }
   updateAll();
   commitHistory();
   showToast(state.backgroundVisible ? "Подложка показана" : "Подложка скрыта");
@@ -3148,7 +3359,7 @@ copyButton.addEventListener("click", async () => {
 
   try {
     await navigator.clipboard.writeText(text);
-    showToast("Список отрезков скопирован");
+    showToast("Список измерений скопирован");
   } catch {
     const fallback = document.createElement("textarea");
     fallback.value = text;
@@ -3159,7 +3370,7 @@ copyButton.addEventListener("click", async () => {
     fallback.select();
     document.execCommand("copy");
     fallback.remove();
-    showToast("Список отрезков скопирован");
+    showToast("Список измерений скопирован");
   }
 });
 
@@ -3227,25 +3438,100 @@ welcomeStartButton.addEventListener("click", dismissWelcome);
 
 referenceLengthInput.addEventListener("input", () => {
   state.referenceValue = referenceLengthInput.value;
+  if (inlineReferenceLengthInput) inlineReferenceLengthInput.value = state.referenceValue;
   updateAll();
 });
 referenceLengthInput.addEventListener("change", () => {
   state.referenceValue = referenceLengthInput.value;
+  if (inlineReferenceLengthInput) inlineReferenceLengthInput.value = state.referenceValue;
   updateAll();
   commitHistory();
 });
 
 unitInput.addEventListener("input", () => {
   state.unit = unitInput.value;
+  if (inlineUnitInput) inlineUnitInput.value = state.unit;
   updateAll();
 });
 unitInput.addEventListener("change", () => {
   state.unit = unitInput.value;
+  if (inlineUnitInput) inlineUnitInput.value = state.unit;
   updateAll();
   commitHistory();
 });
 
 segmentsSortSelect.addEventListener("change", renderSegments);
+
+backgroundOpacityInput?.addEventListener("input", () => {
+  setBackgroundOpacity(Number(backgroundOpacityInput.value) / 100);
+  updateAll();
+});
+
+backgroundOpacityInput?.addEventListener("change", () => {
+  setBackgroundOpacity(Number(backgroundOpacityInput.value) / 100);
+  updateAll();
+  commitHistory();
+});
+
+toggleBackgroundOpacityButton?.addEventListener("click", () => {
+  if (!state.image) return;
+  if (state.backgroundVisible) {
+    setBackgroundOpacity(0, { remember: false });
+  } else {
+    setBackgroundOpacity(state.previousBackgroundOpacity || 1);
+  }
+  updateAll();
+  commitHistory();
+});
+
+inlineUnitInput?.addEventListener("change", () => {
+  state.unit = inlineUnitInput.value;
+  setUnitInputValue(state.unit);
+  updateAll();
+});
+
+inlineCalibration?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const value = inlineReferenceLengthInput?.value || "";
+  if (parseDecimal(value) === null) {
+    showToast("Введите длину базового отрезка");
+    inlineReferenceLengthInput?.focus();
+    return;
+  }
+  state.referenceValue = value;
+  referenceLengthInput.value = value;
+  state.unit = inlineUnitInput?.value || state.unit;
+  setUnitInputValue(state.unit);
+  state.nextActionPromptVisible = true;
+  state.isDrawingSegments = false;
+  updateAll();
+  commitHistory();
+});
+
+manualModeButton?.addEventListener("click", () => {
+  state.nextActionPromptVisible = false;
+  state.isDrawingSegments = true;
+  state.detectedSegments = [];
+  updateAll();
+  saveSnapshotToStorage();
+});
+
+detectModeButton?.addEventListener("click", () => {
+  state.nextActionPromptVisible = false;
+  state.detectionSensitivity = detectionSensitivityInput?.value || state.detectionSensitivity;
+  updateAll();
+  analyzeImageSegments({ automatic: false, sensitivity: state.detectionSensitivity });
+});
+
+detectionSensitivityInput?.addEventListener("change", () => {
+  state.detectionSensitivity = detectionSensitivityInput.value;
+  saveSnapshotToStorage();
+});
+
+scaleRulerResetButton?.addEventListener("click", () => {
+  fitImage();
+  scheduleViewSave();
+});
 
 function setSidebarCollapsed(collapsed) {
   if (!collapsed && isMobileLayout() && state.image && !hasCompleteBaseLength()) {
