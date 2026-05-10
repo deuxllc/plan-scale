@@ -93,7 +93,7 @@ function findAxisAlignment(point, segments, segmentId, scale, { fieldCenter = po
   };
 }
 
-function nearOrthogonalAxis(point, anchor, toleranceDegrees = 12) {
+function nearOrthogonalAxis(point, anchor, toleranceDegrees = 6) {
   const dx = point.x - anchor.x;
   const dy = point.y - anchor.y;
   const length = Math.hypot(dx, dy);

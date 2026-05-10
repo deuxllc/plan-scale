@@ -1,3 +1,7 @@
+const DETECTION_SENSITIVITY_MIN = 15;
+const DETECTION_SENSITIVITY_MAX = 100;
+const DEFAULT_DETECTION_SENSITIVITY = DETECTION_SENSITIVITY_MIN;
+
 self.addEventListener("message", (event) => {
   if (event.data?.type !== "analyze") return;
   const { width, height, processScale, maxSegments, sensitivity, buffer } = event.data;
@@ -7,15 +11,22 @@ self.addEventListener("message", (event) => {
 });
 
 function normalizeDetectionSensitivity(value) {
-  if (value === "clear") return 15;
+  if (value === "clear") return DETECTION_SENSITIVITY_MIN;
   if (value === "balanced") return 50;
   if (value === "detailed") return 85;
   const numeric = Number(value);
-  return Number.isFinite(numeric) ? Math.min(100, Math.max(0, numeric)) : 50;
+  return Number.isFinite(numeric)
+    ? Math.min(DETECTION_SENSITIVITY_MAX, Math.max(DETECTION_SENSITIVITY_MIN, numeric))
+    : DEFAULT_DETECTION_SENSITIVITY;
+}
+
+function detectionSensitivityProgress(value) {
+  const range = Math.max(1, DETECTION_SENSITIVITY_MAX - DETECTION_SENSITIVITY_MIN);
+  return (normalizeDetectionSensitivity(value) - DETECTION_SENSITIVITY_MIN) / range;
 }
 
 function detectionProfile(value) {
-  const t = normalizeDetectionSensitivity(value) / 100;
+  const t = detectionSensitivityProgress(value);
   const strictness = (1 - t) ** 2;
   return {
     minRunRatio: 0.02 + strictness * 0.28,

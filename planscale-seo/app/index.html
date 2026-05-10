@@ -200,6 +200,8 @@
                 <option value="см">см</option>
                 <option value="мм">мм</option>
                 <option value="км">км</option>
+                <option value="ft">ft</option>
+                <option value="in">in</option>
               </select>
             </div>
           </div>
@@ -257,6 +259,10 @@
                 </button>
               </div>
             </div>
+            <button id="resetPlanButton" class="tool-button reset-top-button danger" type="button" title="Сбросить изображение, разметку и базовый размер">
+              <svg class="button-icon"><use href="#icon-trash"></use></svg>
+              <span>Сброс</span>
+            </button>
           </div>
 
           <span class="status" id="statusText">Загрузите изображение</span>
@@ -316,6 +322,8 @@
                 <option value="см">см</option>
                 <option value="мм">мм</option>
                 <option value="км">км</option>
+                <option value="ft">ft</option>
+                <option value="in">in</option>
               </select>
               <button class="primary-action" type="submit">OK</button>
             </div>
@@ -323,6 +331,13 @@
           <section class="next-action-panel" id="nextActionPanel" aria-label="Следующий шаг" hidden>
             <span>Изображение загружено</span>
             <strong>Что хотите сделать?</strong>
+            <div class="unit-system-choice" aria-label="Единицы проекта">
+              <span>Единицы проекта</span>
+              <div>
+                <button id="metricUnitsButton" type="button" aria-pressed="true">Метрические</button>
+                <button id="imperialUnitsButton" type="button" aria-pressed="false">Imperial</button>
+              </div>
+            </div>
             <div class="next-action-grid">
               <button id="manualModeButton" type="button">
                 <strong>Рисовать вручную</strong>
@@ -333,16 +348,17 @@
                 <small>Сначала распознаем линии, потом выберите базовый отрезок.</small>
               </button>
             </div>
-            <label class="detection-sensitivity" for="detectionSensitivityInput">
+            <label class="detection-sensitivity" id="detectionSensitivityControl" for="detectionSensitivityInput" hidden>
               <span>Чувствительность поиска</span>
               <strong id="detectionSensitivityValue">Сбалансировано</strong>
-              <input id="detectionSensitivityInput" type="range" min="0" max="100" step="1" value="50" />
+              <input id="detectionSensitivityInput" type="range" min="15" max="100" step="1" value="15" />
               <div class="sensitivity-scale" aria-hidden="true">
                 <span>Меньше лишних</span>
                 <span>Сбалансировано</span>
                 <span>Больше деталей</span>
               </div>
             </label>
+            <button id="runDetectionButton" class="primary-action detection-run-button" type="button" hidden>Найти линии</button>
           </section>
           <div class="cursor-coordinates" id="cursorCoordinates" aria-live="off" hidden>x 0 · y 0</div>
           <div class="empty-state" id="emptyState">
@@ -429,12 +445,6 @@
           <div class="no-segments" id="noSegments">Отрезков пока нет.</div>
         </section>
 
-        <section class="reset-section" aria-label="Сброс проекта">
-          <button id="resetPlanButton" class="reset-project-button danger" type="button" title="Удалить изображение, разметку и базовый размер из текущей сессии">
-            <svg class="button-icon"><use href="#icon-trash"></use></svg>
-            <span>Сбросить всё</span>
-          </button>
-        </section>
       </aside>
     </main>
 

@@ -80,8 +80,12 @@ const inlineUnitInput = document.querySelector("#inlineUnitInput");
 const nextActionPanel = document.querySelector("#nextActionPanel");
 const manualModeButton = document.querySelector("#manualModeButton");
 const detectModeButton = document.querySelector("#detectModeButton");
+const runDetectionButton = document.querySelector("#runDetectionButton");
 const detectionSensitivityInput = document.querySelector("#detectionSensitivityInput");
+const detectionSensitivityControl = document.querySelector("#detectionSensitivityControl");
 const detectionSensitivityValue = document.querySelector("#detectionSensitivityValue");
+const metricUnitsButton = document.querySelector("#metricUnitsButton");
+const imperialUnitsButton = document.querySelector("#imperialUnitsButton");
 const scaleRuler = document.querySelector("#scaleRuler");
 const scaleRulerValue = document.querySelector("#scaleRulerValue");
 const scaleRulerLine = document.querySelector("#scaleRulerLine");
@@ -96,6 +100,11 @@ const CANVAS_COLORS = {
   detected: "#6475d9",
   leader: "rgba(79, 97, 120, 0.44)",
 };
+
+const DETECTION_SENSITIVITY_MIN = 15;
+const DETECTION_SENSITIVITY_MAX = 100;
+const DEFAULT_DETECTION_SENSITIVITY = DETECTION_SENSITIVITY_MIN;
+const IMPERIAL_UNITS = new Set(["ft", "in"]);
 
 const state = {
   image: null,
@@ -113,6 +122,7 @@ const state = {
   selectedSegmentIds: new Set(),
   referenceValue: "",
   unit: unitInput.value || "м",
+  unitSystem: IMPERIAL_UNITS.has(unitInput.value) ? "imperial" : "metric",
   footnotesVisible: true,
   pendingPoint: null,
   isDragging: false,
@@ -131,7 +141,7 @@ const state = {
   smartGridEnabled: true,
   nextActionPromptVisible: false,
   workflowMode: null,
-  detectionSensitivity: Number(detectionSensitivityInput?.value) || 50,
+  detectionSensitivity: Number(detectionSensitivityInput?.value) || DEFAULT_DETECTION_SENSITIVITY,
   isDrawingSegments: false,
   isChoosingBase: false,
   sidebarCollapsed: true,
@@ -184,6 +194,27 @@ function setUnitInputValue(value) {
   return unitInput.value || unit;
 }
 
+function unitSystemForUnit(unit) {
+  return IMPERIAL_UNITS.has(unit) ? "imperial" : "metric";
+}
+
+function updateUnitSystemControls() {
+  metricUnitsButton?.setAttribute("aria-pressed", String(state.unitSystem !== "imperial"));
+  imperialUnitsButton?.setAttribute("aria-pressed", String(state.unitSystem === "imperial"));
+}
+
+function setProjectUnitSystem(system, { commit = false } = {}) {
+  const nextSystem = system === "imperial" ? "imperial" : "metric";
+  state.unitSystem = nextSystem;
+  state.unit = nextSystem === "imperial" ? "ft" : "м";
+  setUnitInputValue(state.unit);
+  updateUnitSystemControls();
+  if (commit) {
+    updateAll();
+    commitHistory();
+  }
+}
+
 function setBackgroundOpacity(value, { remember = true } = {}) {
   const opacity = Math.min(1, Math.max(0, Number.isFinite(value) ? value : 1));
   if (remember && opacity > 0.02) {
@@ -210,17 +241,24 @@ function updateBackgroundOpacityControls() {
 }
 
 function normalizeDetectionSensitivity(value) {
-  if (value === "clear") return 15;
+  if (value === "clear") return DETECTION_SENSITIVITY_MIN;
   if (value === "balanced") return 50;
   if (value === "detailed") return 85;
   const numeric = Number(value);
-  return Number.isFinite(numeric) ? Math.min(100, Math.max(0, numeric)) : 50;
+  return Number.isFinite(numeric)
+    ? Math.min(DETECTION_SENSITIVITY_MAX, Math.max(DETECTION_SENSITIVITY_MIN, numeric))
+    : DEFAULT_DETECTION_SENSITIVITY;
+}
+
+function detectionSensitivityProgress(value = state.detectionSensitivity) {
+  const range = Math.max(1, DETECTION_SENSITIVITY_MAX - DETECTION_SENSITIVITY_MIN);
+  return (normalizeDetectionSensitivity(value) - DETECTION_SENSITIVITY_MIN) / range;
 }
 
 function sensitivityLabel(value) {
-  const numeric = normalizeDetectionSensitivity(value);
-  if (numeric <= 30) return "Меньше лишних";
-  if (numeric >= 70) return "Больше деталей";
+  const progress = detectionSensitivityProgress(value);
+  if (progress <= 0.28) return "Меньше лишних";
+  if (progress >= 0.72) return "Больше деталей";
   return "Сбалансировано";
 }
 
@@ -229,11 +267,17 @@ function updateDetectionSensitivityControls() {
   state.detectionSensitivity = value;
   if (detectionSensitivityInput) {
     detectionSensitivityInput.value = String(value);
-    detectionSensitivityInput.style.setProperty("--sensitivity-progress", `${value}%`);
+    const progress = detectionSensitivityProgress(value) * 100;
+    detectionSensitivityInput.style.setProperty("--sensitivity-progress", `${Math.max(0, Math.min(100, progress))}%`);
   }
   if (detectionSensitivityValue) {
     detectionSensitivityValue.textContent = sensitivityLabel(value);
   }
+  const showSensitivity = state.nextActionPromptVisible && state.workflowMode === "auto";
+  if (detectionSensitivityControl) detectionSensitivityControl.hidden = !showSensitivity;
+  if (runDetectionButton) runDetectionButton.hidden = !showSensitivity;
+  detectModeButton?.setAttribute("aria-pressed", String(state.workflowMode === "auto"));
+  manualModeButton?.setAttribute("aria-pressed", String(state.workflowMode === "manual"));
 }
 
 function clonePoint(point) {
@@ -267,6 +311,7 @@ function snapshotState() {
     selectedSegmentIds: getSelectedIds(),
     referenceValue: state.referenceValue,
     unit: state.unit,
+    unitSystem: state.unitSystem,
     footnotesVisible: state.footnotesVisible,
     smartGridEnabled: state.smartGridEnabled,
     detectionSensitivity: state.detectionSensitivity,
@@ -321,6 +366,7 @@ async function applySnapshot(snapshot) {
     state.selectedSegmentIds = new Set(snapshot.selectedSegmentIds || []);
     state.referenceValue = snapshot.referenceValue || "";
     state.unit = snapshot.unit || "м";
+    state.unitSystem = snapshot.unitSystem || unitSystemForUnit(state.unit);
     state.footnotesVisible = typeof snapshot.footnotesVisible === "boolean"
       ? snapshot.footnotesVisible
       : state.segments.length === 0 || state.segments.some((segment) => segment.labelHidden !== true);
@@ -347,6 +393,7 @@ async function applySnapshot(snapshot) {
 
     referenceLengthInput.value = state.referenceValue;
     setUnitInputValue(state.unit);
+    updateUnitSystemControls();
     if (inlineReferenceLengthInput) inlineReferenceLengthInput.value = state.referenceValue;
     if (inlineUnitInput) inlineUnitInput.value = state.unit;
     updateDetectionSensitivityControls();
@@ -484,6 +531,7 @@ function updateToolControls() {
   }
 
   updateBackgroundOpacityControls();
+  updateUnitSystemControls();
   updateDetectionSensitivityControls();
   const underlayLabel = removeUnderlayButton.querySelector("span");
   if (underlayLabel) {
@@ -915,11 +963,7 @@ function imageToScreen(point) {
 }
 
 function clampPointToImage(point) {
-  if (!state.image) return point;
-  return {
-    x: Math.min(Math.max(point.x, 0), state.image.width),
-    y: Math.min(Math.max(point.y, 0), state.image.height),
-  };
+  return point;
 }
 
 function segmentLength(segment) {
@@ -1648,7 +1692,7 @@ function materializeDetectedSegments(append = false) {
 }
 
 function detectionProfile(value = state.detectionSensitivity) {
-  const t = normalizeDetectionSensitivity(value) / 100;
+  const t = detectionSensitivityProgress(value);
   const strictness = (1 - t) ** 2;
   return {
     minRunRatio: 0.02 + strictness * 0.28,
@@ -3172,6 +3216,7 @@ function resetPlan() {
 
   analysisRunId++;
   const rememberedUnit = state.unit || "м";
+  const rememberedUnitSystem = state.unitSystem || unitSystemForUnit(rememberedUnit);
   state.image = null;
   state.imageSrc = "";
   state.imageName = "";
@@ -3188,6 +3233,7 @@ function resetPlan() {
   state.selectedSegmentIds = new Set();
   state.referenceValue = "";
   state.unit = rememberedUnit;
+  state.unitSystem = rememberedUnitSystem;
   state.footnotesVisible = true;
   state.pendingPoint = null;
   state.isDragging = false;
@@ -3206,6 +3252,7 @@ function resetPlan() {
   state.isChoosingBase = false;
   state.nextActionPromptVisible = false;
   state.workflowMode = null;
+  state.detectionSensitivity = DEFAULT_DETECTION_SENSITIVITY;
   state.isAnalyzing = false;
   state.hoveredSegmentId = null;
   nextSegmentId = 1;
@@ -3213,6 +3260,7 @@ function resetPlan() {
   imageInput.value = "";
   referenceLengthInput.value = "";
   setUnitInputValue(rememberedUnit);
+  updateUnitSystemControls();
   emptyState.hidden = false;
   exportStatus.hidden = true;
   exportStatus.innerHTML = "";
@@ -3275,6 +3323,7 @@ function loadImageFile(file) {
       state.previewPoint = null;
       state.orthogonalGuide = null;
       state.workflowMode = null;
+      state.detectionSensitivity = DEFAULT_DETECTION_SENSITIVITY;
       state.isDrawingSegments = false;
       state.nextActionPromptVisible = !preserveExistingMarkup;
       state.isAnalyzing = false;
@@ -3502,11 +3551,13 @@ referenceLengthInput.addEventListener("change", () => {
 
 unitInput.addEventListener("input", () => {
   state.unit = unitInput.value;
+  state.unitSystem = unitSystemForUnit(state.unit);
   if (inlineUnitInput) inlineUnitInput.value = state.unit;
   updateAll();
 });
 unitInput.addEventListener("change", () => {
   state.unit = unitInput.value;
+  state.unitSystem = unitSystemForUnit(state.unit);
   if (inlineUnitInput) inlineUnitInput.value = state.unit;
   updateAll();
   commitHistory();
@@ -3538,6 +3589,7 @@ toggleBackgroundOpacityButton?.addEventListener("click", () => {
 
 inlineUnitInput?.addEventListener("change", () => {
   state.unit = inlineUnitInput.value;
+  state.unitSystem = unitSystemForUnit(state.unit);
   setUnitInputValue(state.unit);
   updateAll();
 });
@@ -3553,6 +3605,7 @@ inlineCalibration?.addEventListener("submit", (event) => {
   state.referenceValue = value;
   referenceLengthInput.value = value;
   state.unit = inlineUnitInput?.value || state.unit;
+  state.unitSystem = unitSystemForUnit(state.unit);
   setUnitInputValue(state.unit);
   state.nextActionPromptVisible = false;
   state.isDrawingSegments = state.workflowMode === "manual";
@@ -3570,10 +3623,16 @@ manualModeButton?.addEventListener("click", () => {
 });
 
 detectModeButton?.addEventListener("click", () => {
-  state.nextActionPromptVisible = false;
   state.workflowMode = "auto";
   state.detectionSensitivity = normalizeDetectionSensitivity(detectionSensitivityInput?.value);
   updateAll();
+  saveSnapshotToStorage();
+});
+
+runDetectionButton?.addEventListener("click", () => {
+  if (!state.image || state.isAnalyzing) return;
+  state.nextActionPromptVisible = false;
+  state.workflowMode = "auto";
   analyzeImageSegments({ automatic: false, sensitivity: state.detectionSensitivity });
 });
 
@@ -3586,6 +3645,14 @@ detectionSensitivityInput?.addEventListener("change", () => {
   state.detectionSensitivity = normalizeDetectionSensitivity(detectionSensitivityInput.value);
   updateDetectionSensitivityControls();
   saveSnapshotToStorage();
+});
+
+metricUnitsButton?.addEventListener("click", () => {
+  setProjectUnitSystem("metric", { commit: Boolean(state.image || state.segments.length) });
+});
+
+imperialUnitsButton?.addEventListener("click", () => {
+  setProjectUnitSystem("imperial", { commit: Boolean(state.image || state.segments.length) });
 });
 
 scaleRulerResetButton?.addEventListener("click", () => {
