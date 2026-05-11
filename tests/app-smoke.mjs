@@ -2,12 +2,13 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 
-const rootDir = resolve(new URL("..", import.meta.url).pathname);
+const rootDir = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const appPath = "/planscale-seo/app/";
 const viewports = [
   { name: "desktop", viewport: { width: 1440, height: 900 }, isMobile: false },
