@@ -173,6 +173,8 @@ async function runCase(browser, origin, profile) {
   await page.locator("#detectModeButton").click();
   const sensitivityVisibleAuto = await page.locator("#detectionSensitivityControl").evaluate((node) => !node.hidden);
   const sliderValue = await page.locator("#detectionSensitivityInput").inputValue();
+  const toolbarRecalibrateVisible = await page.locator("#recalibrateButton").isVisible();
+  const toolbarBaseFieldVisible = await page.locator("#referenceLengthInput").isVisible();
   await page.locator("#manualModeButton").click();
   await page.waitForFunction(() => document.querySelector("#nextActionPanel")?.hidden === true, null, { timeout: 6000 });
 
@@ -190,6 +192,14 @@ async function runCase(browser, origin, profile) {
   await page.mouse.click(firstPoint.x, firstPoint.y);
   await page.mouse.click(secondPoint.x, secondPoint.y);
   await page.waitForFunction(() => document.querySelector("#panelSummary")?.textContent.includes("1 измерение"), null, { timeout: 6000 });
+  await page.locator("#inlineCalibration").waitFor({ state: "visible", timeout: 6000 });
+  const inlineText = await page.locator("#inlineCalibration").textContent();
+  const inlineHasBaseLabel = inlineText?.includes("Базовый размер") || false;
+  const inlineSubmitText = await page.locator("#inlineCalibration button[type='submit']").textContent();
+  await page.locator("#inlineReferenceLengthInput").fill("5");
+  await page.locator("#inlineCalibration button[type='submit']").click();
+  await page.waitForFunction(() => document.querySelector("#inlineCalibration")?.hidden === true, null, { timeout: 6000 });
+  const scaleRulerVisible = await page.locator("#scaleRuler").isVisible();
 
   await page.locator("#exportMenuButton").click();
   await page.locator("#exportJsonButton").click();
@@ -207,6 +217,11 @@ async function runCase(browser, origin, profile) {
     sensitivityHiddenInitially,
     sensitivityVisibleAuto,
     sliderValue,
+    toolbarRecalibrateVisible,
+    toolbarBaseFieldVisible,
+    inlineHasBaseLabel,
+    inlineSubmitText,
+    scaleRulerVisible,
     segmentCreated: panelSummary.includes("1 измерение"),
     exportReady: exportStatus?.includes("Экспорт готов") || false,
     hasTrueScale: bodyText.includes("TrueScale"),
@@ -232,6 +247,11 @@ try {
     !result.sensitivityHiddenInitially ||
     !result.sensitivityVisibleAuto ||
     result.sliderValue !== "15" ||
+    !result.toolbarRecalibrateVisible ||
+    result.toolbarBaseFieldVisible ||
+    result.inlineHasBaseLabel ||
+    result.inlineSubmitText?.trim() !== "Готово" ||
+    !result.scaleRulerVisible ||
     !result.segmentCreated ||
     !result.exportReady ||
     !result.hasTrueScale

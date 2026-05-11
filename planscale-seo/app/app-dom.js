@@ -19,6 +19,7 @@
     measureGroup: document.querySelector(".measure-group"),
     historyGroup: document.querySelector(".history-group"),
     baseSection: document.querySelector(".base-section"),
+    recalibrateButton: document.querySelector("#recalibrateButton"),
     undoButton: document.querySelector("#undoButton"),
     redoButton: document.querySelector("#redoButton"),
     clearButton: document.querySelector("#clearButton"),

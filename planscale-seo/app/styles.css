@@ -4180,6 +4180,50 @@ body.sidebar-collapsed:not(.empty-mode) aside.panel,
   display: none !important;
 }
 
+/* Recalibration replaces the old always-visible base-size field in the toolbar. */
+.reference-storage[hidden] {
+  display: none !important;
+}
+
+.recalibrate-button {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.recalibrate-button.needs-attention {
+  border-color: rgba(234, 179, 8, 0.72);
+  box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.12);
+}
+
+.inline-calibration {
+  grid-template-columns: minmax(94px, 1fr) 70px 82px;
+  width: min(304px, calc(100% - 24px));
+  gap: 6px;
+  padding: 6px;
+}
+
+.inline-calibration input,
+.inline-calibration select {
+  height: 34px;
+  font-size: 16px;
+}
+
+.inline-calibration button {
+  min-height: 34px;
+  font-size: 14px;
+}
+
+@media (min-width: 761px) {
+  .topbar .measure-group {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+}
+
 @media (max-width: 760px) {
   .plan-upload-button {
     grid-column: 1 / span 2;
@@ -4210,6 +4254,20 @@ body.sidebar-collapsed:not(.empty-mode) aside.panel,
   #resetPlanButton {
     grid-column: 9;
     grid-row: 2;
+  }
+
+  #recalibrateButton {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    width: 100% !important;
+    min-width: 0;
+    height: var(--mobile-tool);
+    min-height: var(--mobile-tool);
+  }
+
+  .inline-calibration {
+    grid-template-columns: minmax(0, 1fr) 68px 80px;
+    width: min(310px, calc(100% - 18px));
   }
 
   .topbar #resetPlanButton {

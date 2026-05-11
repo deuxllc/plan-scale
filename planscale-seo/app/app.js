@@ -35,6 +35,7 @@ const {
   measureGroup,
   historyGroup,
   baseSection,
+  recalibrateButton,
   undoButton,
   redoButton,
   clearButton,
@@ -161,6 +162,7 @@ const state = {
   nextActionPromptVisible: false,
   workflowMode: null,
   detectionSensitivity: Number(detectionSensitivityInput?.value) || DEFAULT_DETECTION_SENSITIVITY,
+  isEditingReferenceLength: false,
   isDrawingSegments: false,
   isChoosingBase: false,
   sidebarCollapsed: true,
@@ -391,6 +393,7 @@ async function applySnapshot(snapshot) {
     state.detectionSensitivity = normalizeDetectionSensitivity(snapshot.detectionSensitivity);
     state.workflowMode = snapshot.workflowMode || null;
     state.nextActionPromptVisible = false;
+    state.isEditingReferenceLength = false;
     state.isDrawingSegments = Boolean(snapshot.isDrawingSegments);
     state.isChoosingBase = Boolean(snapshot.isChoosingBase);
     state.isSpacePressed = false;
@@ -562,12 +565,22 @@ function updateToolControls() {
   updateAllFootnotesButtonState();
 
   const hasBase = Boolean(state.referenceId);
+  const hasSegments = state.segments.length > 0;
   const baseLengthComplete = hasCompleteBaseLength();
   referenceLengthInput.disabled = !hasBase;
   focusReferenceButton.hidden = !hasBase;
   focusBaseInputButton.disabled = !hasBase;
-  chooseBaseButton.disabled = !state.segments.length;
+  chooseBaseButton.disabled = !hasSegments;
   chooseBaseButton.textContent = hasBase ? "Перекалибровать" : "Выбрать отрезок";
+  if (recalibrateButton) {
+    recalibrateButton.disabled = !hasSegments;
+    recalibrateButton.title = !hasSegments
+      ? "Сначала добавьте или примите отрезки"
+      : hasBase
+        ? "Изменить масштаб проекта"
+        : "Выбрать базовый отрезок";
+    recalibrateButton.setAttribute("aria-label", recalibrateButton.title);
+  }
   const sidebarLocked = isMobileLayout() && state.image && !baseLengthComplete;
   sidebarToggleButton.disabled = sidebarLocked;
   sidebarToggleButton.title = sidebarLocked
@@ -605,9 +618,10 @@ function updateGuidanceControls() {
     }
   } else if (needsLength) {
     calibrationHintTitle.textContent = "Введите базовый размер";
-    calibrationHintText.textContent = "Введите реальную длину рядом с базовым отрезком и нажмите OK.";
+    calibrationHintText.textContent = "Введите реальную длину рядом с базовым отрезком и нажмите Готово.";
   }
   referenceField?.classList.toggle("needs-attention", needsBase || needsLength);
+  recalibrateButton?.classList.toggle("needs-attention", needsBase || needsLength);
   referenceLengthInput.setAttribute("aria-invalid", String(needsLength && state.referenceValue.trim().length > 0));
   if (baseConfirm) {
     baseConfirm.hidden = !state.pendingReferenceId;
@@ -624,7 +638,7 @@ function syncInlineCalibration() {
   if (!inlineCalibration) return;
 
   const reference = state.segments.find((segment) => segment.id === state.referenceId);
-  const needsLength = Boolean(state.image && reference && parseDecimal(state.referenceValue) === null);
+  const needsLength = Boolean(state.image && reference && (state.isEditingReferenceLength || parseDecimal(state.referenceValue) === null));
   inlineCalibration.hidden = !needsLength;
   if (!needsLength) return;
 
@@ -1278,18 +1292,39 @@ function startChoosingBase() {
     return;
   }
   state.isChoosingBase = true;
+  state.isEditingReferenceLength = Boolean(state.referenceId);
   state.pendingReferenceId = null;
   state.pendingPoint = null;
   state.previewPoint = null;
   state.orthogonalGuide = null;
-  clearSelection();
+  if (state.referenceId) {
+    selectOnlySegment(state.referenceId);
+  } else {
+    clearSelection();
+  }
   updateAll();
-  showToast("Кликните по базовому отрезку");
+  showToast(state.referenceId ? "Выберите новый отрезок или измените длину" : "Кликните по базовому отрезку");
+  if (state.referenceId) {
+    window.setTimeout(() => {
+      inlineReferenceLengthInput?.focus();
+      inlineReferenceLengthInput?.select();
+    }, 40);
+  }
 }
 
 function setReferenceSegment(id, { focusLength = true } = {}) {
+  const previousReferenceId = state.referenceId;
+  const changedReference = previousReferenceId !== id;
   state.referenceId = id;
   state.isChoosingBase = false;
+  state.isEditingReferenceLength = true;
+  if (changedReference) {
+    state.referenceValue = "";
+    referenceLengthInput.value = "";
+    if (inlineReferenceLengthInput) inlineReferenceLengthInput.value = "";
+  } else if (inlineReferenceLengthInput) {
+    inlineReferenceLengthInput.value = state.referenceValue;
+  }
   state.pendingReferenceId = null;
   selectOnlySegment(id);
   state.pendingPoint = null;
@@ -1297,9 +1332,11 @@ function setReferenceSegment(id, { focusLength = true } = {}) {
   updateAll();
   commitHistory();
   if (focusLength) {
-    const target = inlineCalibration && !inlineCalibration.hidden ? inlineReferenceLengthInput : referenceLengthInput;
-    target?.focus();
-    target?.select();
+    window.setTimeout(() => {
+      const target = inlineReferenceLengthInput || referenceLengthInput;
+      target?.focus();
+      target?.select();
+    }, 40);
   }
 }
 
@@ -2388,6 +2425,7 @@ function deleteSegments(ids) {
   if (idsToDelete.has(state.referenceId)) {
     state.referenceId = null;
     state.referenceValue = "";
+    state.isEditingReferenceLength = false;
     referenceLengthInput.value = "";
     if (inlineReferenceLengthInput) inlineReferenceLengthInput.value = "";
     state.isChoosingBase = state.segments.length > 0;
@@ -2423,6 +2461,7 @@ function resetPlan() {
   state.referenceId = null;
   state.selectedSegmentIds = new Set();
   state.referenceValue = "";
+  state.isEditingReferenceLength = false;
   state.unit = rememberedUnit;
   state.unitSystem = rememberedUnitSystem;
   state.footnotesVisible = true;
@@ -2503,6 +2542,7 @@ function loadImageFile(file) {
         state.segments = [];
         state.referenceId = null;
         state.referenceValue = "";
+        state.isEditingReferenceLength = false;
         referenceLengthInput.value = "";
         if (inlineReferenceLengthInput) inlineReferenceLengthInput.value = "";
         state.isChoosingBase = false;
@@ -2575,14 +2615,19 @@ cancelDetectedButton.addEventListener("click", () => {
   showToast("Найденные отрезки отменены");
 });
 focusReferenceButton.addEventListener("click", () => {
-  const target = inlineCalibration && !inlineCalibration.hidden ? inlineReferenceLengthInput : referenceLengthInput;
-  target?.focus();
+  state.isEditingReferenceLength = Boolean(state.referenceId);
+  updateAll();
+  inlineReferenceLengthInput?.focus();
+  inlineReferenceLengthInput?.select();
 });
 focusBaseInputButton.addEventListener("click", () => {
-  const target = inlineCalibration && !inlineCalibration.hidden ? inlineReferenceLengthInput : referenceLengthInput;
-  target?.focus();
+  state.isEditingReferenceLength = Boolean(state.referenceId);
+  updateAll();
+  inlineReferenceLengthInput?.focus();
+  inlineReferenceLengthInput?.select();
 });
 chooseBaseButton.addEventListener("click", startChoosingBase);
+recalibrateButton?.addEventListener("click", startChoosingBase);
 confirmBaseButton?.addEventListener("click", confirmPendingReference);
 cancelBaseButton?.addEventListener("click", () => {
   hideBaseConfirmation();
@@ -2798,6 +2843,8 @@ inlineCalibration?.addEventListener("submit", (event) => {
   state.unit = inlineUnitInput?.value || state.unit;
   state.unitSystem = unitSystemForUnit(state.unit);
   setUnitInputValue(state.unit);
+  state.isEditingReferenceLength = false;
+  state.isChoosingBase = false;
   state.nextActionPromptVisible = false;
   state.isDrawingSegments = state.workflowMode === "manual";
   updateAll();

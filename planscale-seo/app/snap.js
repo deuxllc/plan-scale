@@ -20,7 +20,7 @@ function buildLineGuide(from, to, axis) {
   };
 }
 
-function findExactEndpointSnap(point, segments, segmentId, scale, tolerancePx = 13) {
+function findExactEndpointSnap(point, segments, segmentId, scale, tolerancePx = 11) {
   let closest = null;
   let closestDistance = Infinity;
 
@@ -45,7 +45,7 @@ function findExactEndpointSnap(point, segments, segmentId, scale, tolerancePx = 
     : null;
 }
 
-function findAxisAlignment(point, segments, segmentId, scale, { fieldCenter = point, fieldRadiusPx = 180, lockAxis = null, tolerancePx = 10 } = {}) {
+function findAxisAlignment(point, segments, segmentId, scale, { fieldCenter = point, fieldRadiusPx = 150, lockAxis = null, tolerancePx = 7 } = {}) {
   let bestX = null;
   let bestY = null;
 
@@ -93,7 +93,7 @@ function findAxisAlignment(point, segments, segmentId, scale, { fieldCenter = po
   };
 }
 
-function nearOrthogonalAxis(point, anchor, toleranceDegrees = 6) {
+function nearOrthogonalAxis(point, anchor, toleranceDegrees = 3) {
   const dx = point.x - anchor.x;
   const dy = point.y - anchor.y;
   const length = Math.hypot(dx, dy);
@@ -121,6 +121,15 @@ function resolvePointWithSnaps({
   }
 
   const endpointSnap = findExactEndpointSnap(rawPoint, segments, segmentId, scale);
+  if (endpointSnap && endpointSnap.distance <= 8) {
+    return {
+      point: endpointSnap.point,
+      snap: { point: endpointSnap.point },
+      guide: null,
+      alignmentGuide: null,
+      axis: null,
+    };
+  }
 
   if (smartGridEnabled && fixedEndpoint) {
     const axis = nearOrthogonalAxis(rawPoint, fixedEndpoint);

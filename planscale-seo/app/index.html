@@ -186,7 +186,16 @@
           </div>
 
           <div class="toolbar-group measure-group">
-            <div class="toolbar-field" aria-label="Размер базового отрезка">
+            <button
+              id="recalibrateButton"
+              class="tool-button recalibrate-button"
+              type="button"
+              title="Изменить масштаб проекта"
+              aria-label="Перекалибровать масштаб проекта"
+            >
+              Перекалибровать
+            </button>
+            <div class="toolbar-field reference-storage" aria-label="Размер базового отрезка" hidden>
               <span>Базовый размер</span>
               <input
                 id="referenceLengthInput"
@@ -314,7 +323,6 @@
             </div>
           </div>
           <form class="inline-calibration" id="inlineCalibration" hidden>
-            <strong>Базовый размер</strong>
             <div class="inline-calibration-row">
               <input id="inlineReferenceLengthInput" type="text" inputmode="decimal" autocomplete="off" placeholder="длина" aria-label="Длина базового отрезка" />
               <select id="inlineUnitInput" autocomplete="off" aria-label="Единица измерения">
@@ -325,7 +333,7 @@
                 <option value="ft">ft</option>
                 <option value="in">in</option>
               </select>
-              <button class="primary-action" type="submit">OK</button>
+              <button class="primary-action" type="submit">Готово</button>
             </div>
           </form>
           <section class="next-action-panel" id="nextActionPanel" aria-label="Следующий шаг" hidden>
